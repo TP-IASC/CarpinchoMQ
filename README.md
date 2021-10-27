@@ -1,2 +1,2 @@
 # CarpinchoMQ
-![CarpinchoMQ logo](/logo.jpeg)
+![CarpinchoMQ logo](/logo.jpg)
