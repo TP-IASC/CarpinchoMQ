@@ -65,4 +65,11 @@ defmodule Queue do
     via_tuple(queue_name)
     |> GenServer.call(request)
   end
+
+  def new(queue_name) do
+    {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, queue_name})
+    replica_name = String.to_atom(Atom.to_string(queue_name) <> "_replica")
+    {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, replica_name})
+    { pid1, pid2 }
+  end
 end
