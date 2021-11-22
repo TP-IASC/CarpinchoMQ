@@ -16,11 +16,7 @@ defmodule ReplicaQueue do
   end
 
 
-  defp sufix, do: "_replica"
-
   defp primary_name() do
-    Atom.to_string(name())
-    |> String.slice(0..-String.length(sufix())-1)
-    |> String.to_atom
+    Queue.primary_name(name())
   end
 end

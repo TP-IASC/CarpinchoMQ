@@ -22,5 +22,5 @@ defmodule PrimaryQueue do
 
 
   defp replica_name(),
-    do: String.to_atom(Atom.to_string(name()) <> "_replica")
+    do: Queue.replica_name(name())
 end
