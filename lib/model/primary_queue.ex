@@ -21,18 +21,26 @@ defmodule PrimaryQueue do
     { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers } }
   end
 
-  def handle_cast({:subscribe, pid}, state) do
-    replica_name()
-    |> Queue.cast({ :subscribe, pid })
+  def handle_call({:subscribe, pid}, _from, state) do
+    if Enum.member?(state.subscribers, pid) do
+      { :reply, :already_subscribed, state }
+    else
+      replica_name()
+      |> Queue.cast({ :subscribe, pid })
 
-    { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+      { :reply, :subscribed, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+    end
   end
 
-  def handle_cast({:unsubscribe, pid}, state) do
-    replica_name()
-    |> Queue.cast({ :unsubscribe, pid })
+  def handle_call({:unsubscribe, pid}, _from, state) do
+    unless Enum.member?(state.subscribers, pid) do
+      { :reply, :not_subscribed, state }
+    else
+      replica_name()
+      |> Queue.cast({ :unsubscribe, pid })
 
-    { :noreply, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+      { :reply, :unsubscribed, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+    end
   end
 
   defp replica_name(),
