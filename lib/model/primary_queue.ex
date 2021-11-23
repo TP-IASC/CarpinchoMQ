@@ -12,7 +12,6 @@ defmodule PrimaryQueue do
     { :ok, state }
   end
 
-
   def handle_cast({:push, payload}, state) do
     new_message = create_message(payload)
 
@@ -22,6 +21,12 @@ defmodule PrimaryQueue do
     { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers } }
   end
 
+  def handle_cast({:subscribe, pid}, state) do
+    replica_name()
+    |> Queue.cast({ :subscribe, pid })
+
+    { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+  end
 
   defp replica_name(),
     do: String.to_atom(Atom.to_string(name()) <> "_replica")

@@ -11,11 +11,13 @@ defmodule ReplicaQueue do
     { :ok, state }
   end
 
-
   def handle_cast({:push, message}, state) do
     { :noreply, %{ elements: [message | state.elements], subscribers: state.subscribers } }
   end
 
+  def handle_cast({:subscribe, pid}, state) do
+    { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+  end
 
   defp sufix, do: "_replica"
 
