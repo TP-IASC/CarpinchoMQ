@@ -19,6 +19,10 @@ defmodule ReplicaQueue do
     { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
   end
 
+  def handle_cast({:unsubscribe, pid}, state) do
+    { :noreply, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+  end
+
   defp sufix, do: "_replica"
 
   defp primary_name() do

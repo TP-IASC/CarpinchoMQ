@@ -13,4 +13,8 @@ defmodule Consumer do
   def subscribe(queue_name, pid) do
     Queue.cast(queue_name, { :subscribe, pid })
   end
+
+  def unsubscribe(queue_name, pid) do
+    Queue.cast(queue_name, { :unsubscribe, pid })
+  end
 end

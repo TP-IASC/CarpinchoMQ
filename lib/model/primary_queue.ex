@@ -28,6 +28,13 @@ defmodule PrimaryQueue do
     { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
   end
 
+  def handle_cast({:unsubscribe, pid}, state) do
+    replica_name()
+    |> Queue.cast({ :unsubscribe, pid })
+
+    { :noreply, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+  end
+
   defp replica_name(),
     do: String.to_atom(Atom.to_string(name()) <> "_replica")
 end
