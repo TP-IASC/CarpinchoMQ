@@ -5,6 +5,8 @@ defmodule Queue do
       import Queue
       require Logger
 
+      defstruct [:elements, :subscribers]
+
       def start_link(name) when is_atom(name) do
         GenServer.start_link(__MODULE__, name, name: via_tuple(name))
       end
@@ -16,12 +18,12 @@ defmodule Queue do
       end
 
       # Por ahi conviene que sea call para que el proceso que envia la request tenga una confirmacion de recepcion
-      def handle_cast({:horde, :resolve_conflict, remote_queue}, queue) do
-        { :noreply, merge_queues(queue, remote_queue) }
+      def handle_cast({:horde, :resolve_conflict, remote_state}, state) do
+        { :noreply, merge_queues(state.elements, remote_state.elements) } # quizas aca habria que mergear los estados completos
       end
 
-      def handle_call(:get, _from, queue) do
-        { :reply, queue, queue }
+      def handle_call(:get, _from, state) do
+        { :reply, state, state }
       end
 
       def name,
@@ -52,7 +54,7 @@ defmodule Queue do
 
   def alive?(name), do: whereis(name) != nil
 
-  def queue(name) do
+  def state(name) do
     call(name, :get)
   end
 

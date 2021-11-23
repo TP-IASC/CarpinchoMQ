@@ -4,20 +4,22 @@ defmodule PrimaryQueue do
 
   def init(name) do
     replica = replica_name()
-    queue = if Queue.alive?(replica), do: Queue.queue(replica), else: []
+    initial_state = %{ elements: [], subscribers: [] }
+    state = if Queue.alive?(replica), do: Queue.state(replica), else: initial_state
     Logger.info "Queue: #{name} started"
     Process.flag(:trap_exit, true)
-    { :ok, queue }
+
+    { :ok, state }
   end
 
 
-  def handle_cast({:push, payload}, queue) do
+  def handle_cast({:push, payload}, state) do
     new_message = create_message(payload)
 
     replica_name()
     |> Queue.cast({ :push, new_message })
 
-    { :noreply, [new_message | queue] }
+    { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers } }
   end
 
 
