@@ -4,7 +4,7 @@ defmodule AvoidReplica do
 
   def has_quorum?(_members), do: true
 
-  def choose_node(identifier, child_spec, members) do
+  def choose_node(child_spec, members) do
     filtered_members = case child_spec.start do
       {ReplicaQueue, :start_link, [replica_name]} when length(members) > 1 ->
         avoid_primary(members, replica_name)
@@ -13,7 +13,7 @@ defmodule AvoidReplica do
       _   -> members
     end
 
-    Horde.UniformDistribution.choose_node(identifier, child_spec, filtered_members)
+    Horde.UniformDistribution.choose_node(child_spec, filtered_members)
   end
 
 
