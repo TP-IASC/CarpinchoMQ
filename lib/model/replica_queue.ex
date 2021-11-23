@@ -4,17 +4,24 @@ defmodule ReplicaQueue do
 
   def init(name) do
     primary = primary_name()
-    queue = if Queue.alive?(primary), do: Queue.queue(primary), else: []
+    initial_state = %{ elements: [], subscribers: [] }
+    state = if Queue.alive?(primary), do: Queue.state(primary), else: initial_state
     Logger.info "Queue: #{name} started"
     Process.flag(:trap_exit, true)
-    { :ok, queue }
+    { :ok, state }
   end
 
-
-  def handle_cast({:push, message}, queue) do
-    { :noreply, [message | queue] }
+  def handle_cast({:push, message}, state) do
+    { :noreply, %{ elements: [message | state.elements], subscribers: state.subscribers } }
   end
 
+  def handle_cast({:subscribe, pid}, state) do
+    { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+  end
+
+  def handle_cast({:unsubscribe, pid}, state) do
+    { :noreply, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+  end
 
   defp sufix, do: "_replica"
 
