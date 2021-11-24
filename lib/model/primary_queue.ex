@@ -18,6 +18,8 @@ defmodule PrimaryQueue do
     replica_name()
     |> Queue.cast({ :push, new_message })
 
+    if state.work_mode == :publish_subscribe, do: send_message_to_subscribers(new_message, state.subscribers)
+
     { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers, work_mode: state.work_mode } }
   end
 
@@ -41,6 +43,10 @@ defmodule PrimaryQueue do
 
       { :reply, :unsubscribed, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid), work_mode: state.work_mode } }
     end
+  end
+
+  defp send_message_to_subscribers(message, subscribers) do
+    Enum.each(subscribers, fn subscriber -> Consumer.send_message(subscriber, message, name()) end)
   end
 
   defp replica_name(),
