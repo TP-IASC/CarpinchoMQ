@@ -6,11 +6,14 @@ defmodule AvoidReplica do
 
   def choose_node(child_spec, members) do
     filtered_members = case child_spec.start do
-      {ReplicaQueue, :start_link, [replica_name]} when length(members) > 1 ->
-        avoid_primary(members, replica_name)
-      {PrimaryQueue, :start_link, [queue_name]} when length(members) > 1 ->
-        avoid_replica(members, queue_name)
+      {ReplicaQueue, :start_link, [name]} -> avoid_primary(members, name)
+      {PrimaryQueue, :start_link, [name]} -> avoid_replica(members, name)
       _   -> members
+    end
+
+    if Enum.empty?(filtered_members) do
+      Logger.info "Not enough nodes available"
+      System.stop(1)
     end
 
     Horde.UniformDistribution.choose_node(child_spec, filtered_members)
