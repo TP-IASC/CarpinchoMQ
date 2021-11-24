@@ -5,7 +5,7 @@ defmodule Queue do
       import Queue
       require Logger
 
-      defstruct [:elements, :subscribers]
+      defstruct [:elements, :subscribers, :work_mode]
 
       def start_link(name) when is_atom(name) do
         GenServer.start_link(__MODULE__, name, name: via_tuple(name))
@@ -24,6 +24,10 @@ defmodule Queue do
 
       def handle_call(:get, _from, state) do
         { :reply, state, state }
+      end
+
+      def handle_cast({:set_work_mode, work_mode}, state) do
+        { :noreply, %{ elements: state.elements, subscribers: state.subscribers, work_mode: work_mode } }
       end
 
       def name,
@@ -68,10 +72,12 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
-  def new(queue_name) do
+  def new(queue_name, work_mode) do
     {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, queue_name})
     replica_name = String.to_atom(Atom.to_string(queue_name) <> "_replica")
     {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, replica_name})
+    GenServer.cast(pid1, {:set_work_mode, work_mode})
+    GenServer.cast(pid2, {:set_work_mode, work_mode})
     { pid1, pid2 }
   end
 end

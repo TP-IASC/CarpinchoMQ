@@ -4,7 +4,7 @@ defmodule PrimaryQueue do
 
   def init(name) do
     replica = replica_name()
-    initial_state = %{ elements: [], subscribers: [] }
+    initial_state = %{ elements: [], subscribers: [], work_mode: nil }
     state = if Queue.alive?(replica), do: Queue.state(replica), else: initial_state
     Logger.info "Queue: #{name} started"
     Process.flag(:trap_exit, true)
@@ -18,7 +18,7 @@ defmodule PrimaryQueue do
     replica_name()
     |> Queue.cast({ :push, new_message })
 
-    { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers } }
+    { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers, work_mode: state.work_mode } }
   end
 
   def handle_call({:subscribe, pid}, _from, state) do
@@ -28,7 +28,7 @@ defmodule PrimaryQueue do
       replica_name()
       |> Queue.cast({ :subscribe, pid })
 
-      { :reply, :subscribed, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+      { :reply, :subscribed, %{ elements: state.elements, subscribers: [pid | state.subscribers], work_mode: state.work_mode } }
     end
   end
 
@@ -39,7 +39,7 @@ defmodule PrimaryQueue do
       replica_name()
       |> Queue.cast({ :unsubscribe, pid })
 
-      { :reply, :unsubscribed, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+      { :reply, :unsubscribed, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid), work_mode: state.work_mode } }
     end
   end
 
