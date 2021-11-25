@@ -12,15 +12,15 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:push, message}, state) do
-    { :noreply, %{ elements: [message | state.elements], subscribers: state.subscribers } }
+    { :noreply, %{ elements: [message | state.elements], max_size: state.max_size, subscribers: state.subscribers } }
   end
 
   def handle_cast({:subscribe, pid}, state) do
-    { :noreply, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+    { :noreply, %{ elements: state.elements, max_size: state.max_size, subscribers: [pid | state.subscribers] } }
   end
 
   def handle_cast({:unsubscribe, pid}, state) do
-    { :noreply, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+    { :noreply, %{ elements: state.elements, max_size: state.max_size, subscribers: List.delete(state.subscribers, pid) } }
   end
 
   defp primary_name() do

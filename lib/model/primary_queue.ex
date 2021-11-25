@@ -13,12 +13,22 @@ defmodule PrimaryQueue do
   end
 
   def handle_cast({:push, payload}, state) do
+
+    size = Queue.check_size(state.elements)
+
+    if size == state.max_size do
+    {:size_error, state.max_size}
+
+    else
+
     new_message = create_message(payload)
 
     replica_name()
     |> Queue.cast({ :push, new_message })
 
-    { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers } }
+
+    { :noreply, %{ elements: [new_message | state.elements], max_size: state.max_size, subscribers: state.subscribers } }
+    end
   end
 
   def handle_call({:subscribe, pid}, _from, state) do
@@ -28,7 +38,7 @@ defmodule PrimaryQueue do
       replica_name()
       |> Queue.cast({ :subscribe, pid })
 
-      { :reply, :subscribed, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+      { :reply, :subscribed, %{ elements: state.elements, max_size: state.max_size, subscribers: [pid | state.subscribers] } }
     end
   end
 
@@ -39,7 +49,7 @@ defmodule PrimaryQueue do
       replica_name()
       |> Queue.cast({ :unsubscribe, pid })
 
-      { :reply, :unsubscribed, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+      { :reply, :unsubscribed, %{ elements: state.elements, max_size: state.max_size, subscribers: List.delete(state.subscribers, pid) } }
     end
   end
 

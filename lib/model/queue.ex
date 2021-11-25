@@ -78,6 +78,15 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
+  def check_size(queue_elements) do
+
+    Enum.count(queue_elements)
+
+
+   # state(queue_name)
+   # |> Enum.count() = state.max_size
+  end
+
   def new(queue_name, max_size) do
     {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [queue_name, max_size]})
     replica_name = String.to_atom(Atom.to_string(queue_name) <> "_replica")
