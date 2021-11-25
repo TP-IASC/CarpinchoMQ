@@ -52,6 +52,14 @@ defmodule Queue do
     %{ id: id, timestamp: now, payload: payload }
   end
 
+  def replica_name(queue_name) when is_atom(queue_name),
+    do: Atom.to_string(queue_name) <> "_replica" |> String.to_atom
+
+  def primary_name(replica_name) when is_atom(replica_name),
+    do: Atom.to_string(replica_name)
+        |> String.slice(0..-String.length("_replica")-1)
+        |> String.to_atom
+
   def alive?(name), do: whereis(name) != nil
 
   def state(name) do
