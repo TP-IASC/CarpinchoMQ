@@ -5,7 +5,6 @@ defmodule AvoidReplica do
   def has_quorum?(_members), do: true
 
   def choose_node(child_spec, members) do
-    Logger.info inspect(child_spec)
     filtered_members = case child_spec.start do
       {ReplicaQueue, :start_link, [[name|_]]} -> avoid_primary(members, name)
       {PrimaryQueue, :start_link, [[name|_]]} -> avoid_replica(members, name)
@@ -30,7 +29,6 @@ defmodule AvoidReplica do
   end
 
   def avoid(members, other_queue) do
-    Logger.info inspect(other_queue)
     other_pid = Queue.whereis(other_queue)
     case other_pid do
       nil -> members

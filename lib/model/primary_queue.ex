@@ -17,7 +17,7 @@ defmodule PrimaryQueue do
     size = Queue.check_size(state.elements)
 
     if size == state.max_size do
-    {:size_error, state.max_size}
+    {:size_error,"Queue max size (#{state.max_size}) cannot be exceded"}
 
     else
 
@@ -25,7 +25,6 @@ defmodule PrimaryQueue do
 
     replica_name()
     |> Queue.cast({ :push, new_message })
-
 
     { :noreply, %{ elements: [new_message | state.elements], max_size: state.max_size, subscribers: state.subscribers } }
     end

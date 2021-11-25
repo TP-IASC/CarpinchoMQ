@@ -27,7 +27,7 @@ defmodule Queue do
       def handle_call(:get, _from, state) do
         { :reply, state, state }
       end
-#Horde.Registry.keys(App.HordeRegistry, self()) |> elem(2) List.first() |>
+
       def name,
         do: Horde.Registry.keys(App.HordeRegistry, self()) |> List.first()
     end
@@ -79,12 +79,7 @@ defmodule Queue do
   end
 
   def check_size(queue_elements) do
-
     Enum.count(queue_elements)
-
-
-   # state(queue_name)
-   # |> Enum.count() = state.max_size
   end
 
   def new(queue_name, max_size) do
