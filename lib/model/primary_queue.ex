@@ -2,9 +2,9 @@ defmodule PrimaryQueue do
   use Queue
   require Logger
 
-  def init(name) do
+  def init([name, max_size]) do
     replica = replica_name()
-    initial_state = %{ elements: [], subscribers: [] }
+    initial_state = %{ elements: [], subscribers: [], max_size: max_size}
     state = if Queue.alive?(replica), do: Queue.state(replica), else: initial_state
     Logger.info "Queue: #{name} started"
     Process.flag(:trap_exit, true)

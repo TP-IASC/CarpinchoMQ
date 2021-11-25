@@ -1,4 +1,5 @@
 defmodule Queue do
+  require Logger
   defmacro __using__(_opts) do
     quote do
       use GenServer
@@ -7,8 +8,9 @@ defmodule Queue do
 
       defstruct [:elements, :subscribers]
 
-      def start_link(name) when is_atom(name) do
-        GenServer.start_link(__MODULE__, name, name: via_tuple(name))
+      def start_link(args) do #when is_atom(name) do
+        [name|_] = args
+        GenServer.start_link(__MODULE__, args, name: via_tuple(name))
       end
 
       def handle_info({:EXIT, _from, {:name_conflict, {name, _value}, _registry_name, winning_pid}}, state) do
@@ -25,7 +27,7 @@ defmodule Queue do
       def handle_call(:get, _from, state) do
         { :reply, state, state }
       end
-
+#Horde.Registry.keys(App.HordeRegistry, self()) |> elem(2) List.first() |>
       def name,
         do: Horde.Registry.keys(App.HordeRegistry, self()) |> List.first()
     end
@@ -76,10 +78,10 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
-  def new(queue_name) do
-    {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, queue_name})
+  def new(queue_name, max_size) do
+    {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [queue_name, max_size]})
     replica_name = String.to_atom(Atom.to_string(queue_name) <> "_replica")
-    {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, replica_name})
+    {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size]})
     { pid1, pid2 }
   end
 end
