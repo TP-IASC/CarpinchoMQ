@@ -6,30 +6,31 @@ defmodule Queue do
       import Queue
       require Logger
 
-      defstruct [:elements, :subscribers]
+      defstruct [:name,
+                 :max_size,
+                 elements: [],
+                 subscribers: []]
 
-      def start_link(args) do #when is_atom(name) do
-        [name|_] = args
-        GenServer.start_link(__MODULE__, args, name: via_tuple(name))
+      def start_link([name, max_size]) when is_atom(name) do
+        default_state = %__MODULE__{ name: name, max_size: max_size }
+        GenServer.start_link(__MODULE__, default_state, name: via_tuple(name))
       end
 
-      def handle_info({:EXIT, _from, {:name_conflict, {name, _value}, _registry_name, winning_pid}}, state) do
-        Logger.info "Resolving conflicts in #{name}"
+      def handle_info({:EXIT, _from, {:name_conflict, {_name, _value}, _registry_name, winning_pid}}, state) do
         GenServer.cast(winning_pid, {:horde, :resolve_conflict, state})
         { :stop, :normal, state }
       end
 
       # Por ahi conviene que sea call para que el proceso que envia la request tenga una confirmacion de recepcion
       def handle_cast({:horde, :resolve_conflict, remote_state}, state) do
-        { :noreply, merge_queues(state.elements, remote_state.elements) } # quizas aca habria que mergear los estados completos
+        Logger.info "Resolving conflicts in #{state.name}..."
+        new_state = Map.put(state, :elements, Queue.merge_queues(state.elements, remote_state.elements))
+        { :noreply, new_state }
       end
 
       def handle_call(:get, _from, state) do
         { :reply, state, state }
       end
-
-      def name,
-        do: Horde.Registry.keys(App.HordeRegistry, self()) |> List.first()
     end
   end
 
@@ -78,13 +79,9 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
-  def check_size(queue_elements) do
-    Enum.count(queue_elements)
-  end
-
   def new(queue_name, max_size) do
     {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [queue_name, max_size]})
-    replica_name = String.to_atom(Atom.to_string(queue_name) <> "_replica")
+    replica_name = Queue.replica_name(queue_name)
     {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size]})
     { pid1, pid2 }
   end
