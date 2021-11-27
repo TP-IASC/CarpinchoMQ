@@ -1,10 +1,13 @@
 defmodule Queue do
   require Logger
+  require OK
+
   defmacro __using__(_opts) do
     quote do
       use GenServer
       import Queue
       require Logger
+      require OK
 
       defstruct [:name,
                  :max_size,
@@ -80,9 +83,12 @@ defmodule Queue do
   end
 
   def new(queue_name, max_size) do
-    {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [queue_name, max_size]})
-    replica_name = Queue.replica_name(queue_name)
-    {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size]})
-    { pid1, pid2 }
+    OK.for do
+      queue_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [queue_name, max_size]})
+      replica_name = Queue.replica_name(queue_name)
+      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size]})
+    after
+      { queue_pid, replica_pid }
+    end
   end
 end

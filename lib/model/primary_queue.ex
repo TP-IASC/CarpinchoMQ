@@ -17,14 +17,14 @@ defmodule PrimaryQueue do
   def handle_call({:push, payload}, _from, state) do
     size = Enum.count(state.elements)
     if size >= state.max_size do
-      { :reply, Errors.error(:max_size_exceded, "Queue max size (#{state.max_size}) cannot be exceded"), state }
+      { :reply, OK.failure({:max_size_exceded, "Queue max size (#{state.max_size}) cannot be exceded"}), state }
     else
       new_message = create_message(payload)
 
       Queue.replica_name(state.name)
       |> Queue.cast({ :push, new_message })
 
-      { :reply, :message_queued, Map.put(state, :elements, [new_message|state.elements]) }
+      { :reply, OK.success(:message_queued), Map.put(state, :elements, [new_message|state.elements]) }
     end
   end
 
