@@ -8,11 +8,12 @@ defmodule Queue do
 
       defstruct [:name,
                  :max_size,
+                 :work_mode,
                  elements: [],
                  subscribers: []]
 
-      def start_link([name, max_size]) when is_atom(name) do
-        default_state = %__MODULE__{ name: name, max_size: max_size }
+      def start_link([name, max_size, work_mode]) when is_atom(name) do
+        default_state = %__MODULE__{ name: name, max_size: max_size, work_mode: work_mode }
         GenServer.start_link(__MODULE__, default_state, name: via_tuple(name))
       end
 

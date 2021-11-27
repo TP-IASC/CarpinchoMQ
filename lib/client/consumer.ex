@@ -11,7 +11,7 @@ defmodule Consumer do
   end
 
   def handle_cast({:send_message, message, consumer_pid, queue_name}, state) do
-    Logger.info "Consumer \"#{inspect consumer_pid}\" received message: #{message.payload} from queue :#{queue_name}"
+    Logger.info "Consumer \"#{inspect consumer_pid}\" received message: \"#{message.payload}\" from queue #{queue_name}"
     { :noreply, state }
   end
 

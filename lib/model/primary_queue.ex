@@ -24,9 +24,10 @@ defmodule PrimaryQueue do
       Queue.replica_name(state.name)
       |> Queue.cast({ :push, new_message })
 
-    if state.work_mode == :publish_subscribe, do: send_message_to_subscribers(new_message, state.subscribers)
+      if state.work_mode == :publish_subscribe, do: send_message_to_subscribers(new_message, state.subscribers, state.name)
 
-    { :reply, :message_queued, Map.put(state, :elements, [new_message|state.elements]) }
+      { :reply, :message_queued, Map.put(state, :elements, [new_message|state.elements]) }
+    end
   end
 
   def handle_call({:subscribe, pid}, _from, state) do
@@ -51,7 +52,7 @@ defmodule PrimaryQueue do
     end
   end
 
-  defp send_message_to_subscribers(message, subscribers) do
-    Enum.each(subscribers, fn subscriber -> Consumer.send_message(subscriber, message, name()) end)
+  defp send_message_to_subscribers(message, subscribers, queue_name) do
+    Enum.each(subscribers, fn subscriber -> Consumer.send_message(subscriber, message, queue_name) end)
   end
 end
