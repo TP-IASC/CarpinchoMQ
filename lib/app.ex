@@ -7,7 +7,7 @@ defmodule App do
     children = [
       { Cluster.Supervisor, [topologies, [name: App.ClusterSupervisor]] },
       App.HordeRegistry,
-      { App.HordeSupervisor, [strategy: :one_for_one] },
+      { App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] },
       App.NodeObserver.Supervisor
     ]
 
