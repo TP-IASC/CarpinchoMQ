@@ -1,10 +1,13 @@
 defmodule Queue do
   require Logger
+  require OK
+
   defmacro __using__(_opts) do
     quote do
       use GenServer
       import Queue
       require Logger
+      require OK
 
       defstruct [:name,
                  :max_size,
@@ -80,10 +83,17 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
-  def new(queue_name, max_size, work_mode) do
-    {:ok, pid1} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [queue_name, max_size, work_mode]})
-    replica_name = Queue.replica_name(queue_name)
-    {:ok, pid2} = Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode]})
-    { pid1, pid2 }
+  def new(queue_name, max_size) do
+    OK.for do
+      primary_name <- check_queue(queue_name)
+      replica_name <- check_queue(Queue.replica_name(queue_name))
+      primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size, work_mode]})
+      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode]})
+    after
+      { primary_pid, replica_pid }
+    end
   end
+
+  defp check_queue(queue_name),
+    do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), {:queue_already_exists, "A queue named #{inspect(queue_name)} already exists"})
 end
