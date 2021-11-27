@@ -83,7 +83,7 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
-  def new(queue_name, max_size) do
+  def new(queue_name, max_size, work_mode) do
     OK.for do
       primary_name <- check_queue(queue_name)
       replica_name <- check_queue(Queue.replica_name(queue_name))
