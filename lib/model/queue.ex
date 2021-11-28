@@ -58,13 +58,18 @@ defmodule Queue do
     %{ id: id, timestamp: now, payload: payload }
   end
 
+  defp replica_sufix, do: "_replica"
+
   def replica_name(queue_name) when is_atom(queue_name),
-    do: Atom.to_string(queue_name) <> "_replica" |> String.to_atom
+    do: Atom.to_string(queue_name) <> replica_sufix() |> String.to_atom
 
   def primary_name(replica_name) when is_atom(replica_name),
     do: Atom.to_string(replica_name)
-        |> String.slice(0..-String.length("_replica")-1)
+        |> String.slice(0..-String.length(replica_sufix())-1)
         |> String.to_atom
+
+  def valid_name?(queue_name),
+    do: not String.ends_with?(Atom.to_string(queue_name), replica_sufix())
 
   def alive?(name), do: whereis(name) != nil
 
@@ -84,6 +89,7 @@ defmodule Queue do
 
   def new(queue_name, max_size) do
     OK.for do
+      _ <- check_name(queue_name)
       { primary_name, replica_name } <- complete_check(queue_name, &check_not_alive/1)
       primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size]})
       replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size]})
@@ -102,6 +108,9 @@ defmodule Queue do
       :deleted
     end
   end
+
+  defp check_name(queue_name),
+    do: OK.check({:ok, queue_name}, &(Queue.valid_name?(&1)), {:name_not_allowed, "Queue name #{inspect(queue_name)} is not allowed"})
 
   defp check_not_alive(queue_name),
     do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), {:queue_already_exists, "A queue named #{inspect(queue_name)} already exists"})
