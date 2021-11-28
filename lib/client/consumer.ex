@@ -10,9 +10,10 @@ defmodule Consumer do
     {:ok, state}
   end
 
-  def handle_cast({:send_message, message, consumer_pid, queue_name}, state) do
+  def handle_call({:send_message, message, consumer_pid, queue_name}, _from, state) do
+    :timer.sleep(:timer.seconds(20))
     Logger.info "Consumer \"#{inspect consumer_pid}\" received message: \"#{message.payload}\" from queue #{queue_name}"
-    { :noreply, state }
+    { :reply, :ack, state }
   end
 
   def subscribe(queue_name, pid) do
@@ -24,6 +25,6 @@ defmodule Consumer do
   end
 
   def send_message(consumer_pid, message, queue_name) do
-    GenServer.cast(consumer_pid, { :send_message, message, consumer_pid, queue_name })
+    GenServer.call(consumer_pid, { :send_message, message, consumer_pid, queue_name })
   end
 end

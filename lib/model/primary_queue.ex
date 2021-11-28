@@ -21,11 +21,10 @@ defmodule PrimaryQueue do
     else
       new_message = create_message(payload)
 
-      Queue.replica_name(state.name)
-      |> Queue.cast({ :push, new_message })
+      send_to_replica(state.name, { :push, new_message })
 
-      if state.work_mode == :publish_subscribe, do: send_message_to_subscribers(new_message, state.subscribers, state.name)
-      
+      if state.work_mode == :publish_subscribe, do: Queue.cast(state.name, {:send_to_subscribers, new_message})
+
       { :reply, OK.success(:message_queued), Map.put(state, :elements, [new_message|state.elements]) }
     end
   end
@@ -34,8 +33,7 @@ defmodule PrimaryQueue do
     if Enum.member?(state.subscribers, pid) do
       { :reply, :already_subscribed, state }
     else
-      Queue.replica_name(state.name)
-      |> Queue.cast({ :subscribe, pid })
+      send_to_replica(state.name, { :subscribe, pid })
 
       { :reply, :subscribed, Map.put(state, :subscribers, [pid|state.subscribers]) }
     end
@@ -45,14 +43,39 @@ defmodule PrimaryQueue do
     unless Enum.member?(state.subscribers, pid) do
       { :reply, :not_subscribed, state }
     else
-      Queue.replica_name(state.name)
-      |> Queue.cast({ :unsubscribe, pid })
+      send_to_replica(state.name, { :unsubscribe, pid })
 
       { :reply, :unsubscribed, Map.put(state, :subscribers, List.delete(state.subscribers, pid)) }
     end
   end
 
-  defp send_message_to_subscribers(message, subscribers, queue_name) do
-    Enum.each(subscribers, fn subscriber -> Consumer.send_message(subscriber, message, queue_name) end)
+  def handle_cast({:delete, message}, state) do
+    send_to_replica(state.name, {:delete, message})
+
+    { :noreply, Map.put(state, :elements, List.delete(state.elements, message)) }
+  end
+
+  def handle_cast({:send_to_subscribers, message}, state) do
+    queue_name = state.name
+    if (Enum.empty?(state.subscribers)) do
+      Logger.warning("The queue \"#{queue_name}\" has not subscribers to send the message")
+    else
+      non_ack_subscribers = state.subscribers
+      |> Enum.map(fn subscriber -> Consumer.send_message(subscriber, message, queue_name) end)
+      |> Enum.filter(fn result -> result != :ack end)
+
+      unless (Enum.empty?(non_ack_subscribers)) do
+        Logger.error("The message \"#{message.payload}\" wasn't able to receive by all the subscribers from the queue \"#{queue_name}\"")
+      else
+        Queue.cast(queue_name, {:delete, message})
+      end
+    end
+
+    { :noreply, state }
+  end
+
+  defp send_to_replica(queue_name, request) do
+    Queue.replica_name(queue_name)
+      |> Queue.cast(request)
   end
 end

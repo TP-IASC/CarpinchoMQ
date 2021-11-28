@@ -18,6 +18,10 @@ defmodule ReplicaQueue do
     { :noreply, Map.put(state, :elements, [message|state.elements]) }
   end
 
+  def handle_cast({:delete, message}, state) do
+    { :noreply, Map.put(state, :elements, List.delete(state.elements, message)) }
+  end
+
   def handle_cast({:subscribe, pid}, state) do
     { :noreply, Map.put(state, :subscribers, [pid|state.subscribers]) }
   end
