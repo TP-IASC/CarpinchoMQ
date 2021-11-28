@@ -23,7 +23,8 @@ defmodule CarpinchoMq.MixProject do
   defp deps do
     [
       { :libcluster, "~> 3.0" },
-      { :horde, git: "https://github.com/TP-IASC/horde.git" }
+      { :horde, git: "https://github.com/TP-IASC/horde.git" },
+      { :ok, "~> 2.3" }
     ]
   end
 end

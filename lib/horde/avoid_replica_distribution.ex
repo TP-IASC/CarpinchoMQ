@@ -6,8 +6,8 @@ defmodule AvoidReplica do
 
   def choose_node(child_spec, members) do
     filtered_members = case child_spec.start do
-      {ReplicaQueue, :start_link, [name]} -> avoid_primary(members, name)
-      {PrimaryQueue, :start_link, [name]} -> avoid_replica(members, name)
+      {ReplicaQueue, :start_link, [[name|_]]} -> avoid_primary(members, name)
+      {PrimaryQueue, :start_link, [[name|_]]} -> avoid_replica(members, name)
       _   -> members
     end
 

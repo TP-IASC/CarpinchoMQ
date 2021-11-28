@@ -2,33 +2,39 @@ defmodule PrimaryQueue do
   use Queue
   require Logger
 
-  def init(name) do
-    replica = replica_name()
-    initial_state = %{ elements: [], subscribers: [] }
-    state = if Queue.alive?(replica), do: Queue.state(replica), else: initial_state
-    Logger.info "Queue: #{name} started"
+  def init(default_state) do
+    Logger.info "Queue: #{default_state.name} started"
     Process.flag(:trap_exit, true)
-
-    { :ok, state }
+    { :ok, default_state, { :continue, :check_replica } }
   end
 
-  def handle_cast({:push, payload}, state) do
-    new_message = create_message(payload)
+  def handle_continue(:check_replica, default_state) do
+    replica = Queue.replica_name(default_state.name)
+    state = if Queue.alive?(replica), do: Queue.state(replica) |> Map.put(:name, default_state.name), else: default_state
+    { :noreply, state }
+  end
 
-    replica_name()
-    |> Queue.cast({ :push, new_message })
+  def handle_call({:push, payload}, _from, state) do
+    size = Enum.count(state.elements)
+    if size >= state.max_size do
+      { :reply, OK.failure({:max_size_exceded, "Queue max size (#{state.max_size}) cannot be exceded"}), state }
+    else
+      new_message = create_message(payload)
 
-    { :noreply, %{ elements: [new_message | state.elements], subscribers: state.subscribers } }
+      Queue.replica_name(state.name)
+      |> Queue.cast({ :push, new_message })
+
+      { :reply, OK.success(:message_queued), Map.put(state, :elements, [new_message|state.elements]) }
+    end
   end
 
   def handle_call({:subscribe, pid}, _from, state) do
     if Enum.member?(state.subscribers, pid) do
       { :reply, :already_subscribed, state }
     else
-      replica_name()
+      Queue.replica_name(state.name)
       |> Queue.cast({ :subscribe, pid })
-
-      { :reply, :subscribed, %{ elements: state.elements, subscribers: [pid | state.subscribers] } }
+      { :reply, :subscribed, Map.put(state, :subscribers, [pid|state.subscribers]) }
     end
   end
 
@@ -36,13 +42,10 @@ defmodule PrimaryQueue do
     unless Enum.member?(state.subscribers, pid) do
       { :reply, :not_subscribed, state }
     else
-      replica_name()
+      Queue.replica_name(state.name)
       |> Queue.cast({ :unsubscribe, pid })
 
-      { :reply, :unsubscribed, %{ elements: state.elements, subscribers: List.delete(state.subscribers, pid) } }
+      { :reply, :unsubscribed, Map.put(state, :subscribers, List.delete(state.subscribers, pid)) }
     end
   end
-
-  defp replica_name(),
-    do: Queue.replica_name(name())
 end
