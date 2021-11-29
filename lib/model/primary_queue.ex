@@ -60,20 +60,22 @@ defmodule PrimaryQueue do
     end))
     # borro al subscriber
 
+    Logger.info("New State: #{inspect new_state}")
     elem = Enum.find(new_state.elements, fn element -> element.message == message end)
+    Logger.info("Elem: #{inspect elem}")
     if Enum.empty?(elem.consumers_that_did_not_ack) do
-      Queue.cast(state.name, {:delete, message})
+      Queue.cast(state.name, {:delete, message, elem})
     end
     # fijarse si ya recibio todos los acks para ese elemento -> si ya los recibio borrar el mensaje
 
     # sino mandarle a la replica
-    { :noreply, state }
+    { :noreply, new_state }
   end
 
-  def handle_cast({:delete, message}, state) do
+  def handle_cast({:delete, message, elem}, state) do
     # send_to_replica(state.name, {:delete, message})
-
-    { :noreply, Map.put(state, :elements, List.delete(state.elements, fn element -> element.message == message end)) }
+    Logger.info("estoy por borrar y voy a quedar asi: #{inspect List.delete(state.elements, elem)}")
+    { :noreply, Map.put(state, :elements, List.delete(state.elements, elem)) }
   end
 
   def handle_cast({:send_to_subscribers, message}, state) do
