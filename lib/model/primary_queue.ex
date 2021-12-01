@@ -21,7 +21,7 @@ defmodule PrimaryQueue do
     else
       new_message = create_message(payload)
 
-      #send_to_replica(state.name, { :push, new_message })
+      send_to_replica(state.name, { :push, new_message })
 
       if state.work_mode == :publish_subscribe, do: Queue.cast(state.name, {:send_to_subscribers, new_message})
 
@@ -49,7 +49,6 @@ defmodule PrimaryQueue do
     end
   end
 
-  # voy recibiendo los acks
   def handle_cast({:send_ack, message, consumer_pid}, state) do
     Logger.info("El consumidor: #{inspect consumer_pid} me mando un ack")
     new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
@@ -59,7 +58,6 @@ defmodule PrimaryQueue do
         element
       end
     end))
-    # borro al subscriber
 
     Logger.info("New State: #{inspect new_state}")
     elem = Enum.find(new_state.elements, fn element -> element.message == message end)
@@ -67,14 +65,13 @@ defmodule PrimaryQueue do
     if Enum.empty?(elem.consumers_that_did_not_ack) do
       Queue.cast(state.name, {:delete, elem})
     end
-    # fijarse si ya recibio todos los acks para ese elemento -> si ya los recibio borrar el mensaje
 
-    # sino mandarle a la replica
+    send_to_replica(state.name, { :send_ack, message, consumer_pid })
     { :noreply, new_state }
   end
 
   def handle_cast({:delete, elem}, state) do
-    # send_to_replica(state.name, {:delete, message})
+    send_to_replica(state.name, {:delete, elem})
     Logger.info("estoy por borrar y voy a quedar asi: #{inspect List.delete(state.elements, elem)}")
     { :noreply, Map.put(state, :elements, List.delete(state.elements, elem)) }
   end
@@ -94,6 +91,7 @@ defmodule PrimaryQueue do
   end
 
   defp add_receivers_to_state_message(state, subscribers, message) do
+    send_to_replica(state.name, { :add_receivers_to_state_message, subscribers, message })
     Map.put(state, :elements, Enum.map(state.elements, fn element ->
       if element.message == message do
         Map.put(element, :consumers_that_did_not_ack, subscribers)
@@ -101,7 +99,6 @@ defmodule PrimaryQueue do
         element
       end
     end))
-    # mandarle a la replica lo mismo
   end
 
   defp send_to_replica(queue_name, request) do
