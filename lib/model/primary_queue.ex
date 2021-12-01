@@ -50,7 +50,6 @@ defmodule PrimaryQueue do
   end
 
   def handle_cast({:send_ack, message, consumer_pid}, state) do
-    Logger.info("El consumidor: #{inspect consumer_pid} me mando un ack")
     new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
       if element.message == message do
         Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
@@ -59,9 +58,7 @@ defmodule PrimaryQueue do
       end
     end))
 
-    Logger.info("New State: #{inspect new_state}")
     elem = Enum.find(new_state.elements, fn element -> element.message == message end)
-    Logger.info("Elem: #{inspect elem}")
     if Enum.empty?(elem.consumers_that_did_not_ack) do
       Queue.cast(state.name, {:delete, elem})
     end
@@ -72,7 +69,7 @@ defmodule PrimaryQueue do
 
   def handle_cast({:delete, elem}, state) do
     send_to_replica(state.name, {:delete, elem})
-    Logger.info("estoy por borrar y voy a quedar asi: #{inspect List.delete(state.elements, elem)}")
+
     { :noreply, Map.put(state, :elements, List.delete(state.elements, elem)) }
   end
 
