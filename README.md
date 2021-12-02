@@ -64,9 +64,6 @@ Para ello se desarrollo una solucion software de administracion de colas de mens
 
 Por otro lado, los receptores de la cola de mensajes podrán optar por dos modalidades de consumo:
 
-En ambos modos para determinar si el consumo fue exitoso CarpinchoMQ espera el ACK enviado por los receptores.
-La diferencia radica en cuando
-
 * Consumo no Transaccional:
   CarpinchoMQ coinsidera que fue un consumo exitoso del mensaje sin esperar la confirmacion por parte del receptor que lo proceso completo (se envia el ACK al principio del procesamiento del mensaje)
 
