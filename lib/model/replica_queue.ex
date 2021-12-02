@@ -15,7 +15,7 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:push, message}, state) do
-    { :noreply, Map.put(state, :elements, [%{message: message, consumers_that_did_not_ack: []}|state.elements]) }
+    { :noreply, Map.put(state, :elements, [%{message: message, consumers_that_did_not_ack: [], number_of_attempts: 0}|state.elements]) }
   end
 
   def handle_cast({:delete, element}, state) do
@@ -34,6 +34,7 @@ defmodule ReplicaQueue do
     { :noreply, Map.put(state, :elements, Enum.map(state.elements, fn element ->
       if element.message == message do
         Map.put(element, :consumers_that_did_not_ack, subscribers)
+        Map.put(element, :number_of_attempts, 1)
       else
         element
       end
