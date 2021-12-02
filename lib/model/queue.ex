@@ -15,9 +15,6 @@ defmodule Queue do
                  elements: [],
                  subscribers: []]
 
-      # @type element :: %{ message, consumidores_que_no_respondieron: [pid] }
-      # TODO: modificar el state para que los elementos tengan esa forma (cada elemento guarda el mensaje y los consumidores que todavia no respondieron)
-
       def start_link([name, max_size, work_mode]) when is_atom(name) do
         default_state = %__MODULE__{ name: name, max_size: max_size, work_mode: work_mode }
         GenServer.start_link(__MODULE__, default_state, name: via_tuple(name))
