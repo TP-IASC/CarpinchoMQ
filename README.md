@@ -1,7 +1,5 @@
 # CarpinchoMQ
 
-# CarpinchoMQ
-
 <div id="top"></div>
 
 <!-- PROJECT LOGO -->
