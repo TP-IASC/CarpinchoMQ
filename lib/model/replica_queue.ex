@@ -15,39 +15,30 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:push, message}, state) do
-    { :noreply, Map.put(state, :elements, [%{message: message, consumers_that_did_not_ack: [], number_of_attempts: 0}|state.elements]) }
+    { :noreply, add_new_element(state, message) }
   end
 
   def handle_cast({:delete, element}, state) do
-    { :noreply, Map.put(state, :elements, List.delete(state.elements, element)) }
+    { :noreply, delete_element(state, element) }
   end
 
   def handle_cast({:subscribe, pid}, state) do
-    { :noreply, Map.put(state, :subscribers, [pid|state.subscribers]) }
+    { :noreply, add_subscriber(state, pid) }
   end
 
   def handle_cast({:unsubscribe, pid}, state) do
-    { :noreply, Map.put(state, :subscribers, List.delete(state.subscribers, pid)) }
+    { :noreply, remove_subscriber(state, pid) }
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
-    { :noreply, Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, subscribers)
-        Map.put(element, :number_of_attempts, 1)
-      else
-        element
-      end
-    end)) }
+    { :noreply, update_specific_element(state, message, &(init_element(&1, subscribers))) }
   end
 
   def handle_cast({:send_ack, message, consumer_pid}, state) do
-    { :noreply, Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
-      else
-        element
-      end
-    end)) }
+    { :noreply, update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, consumer_pid))) }
+  end
+
+  def handle_cast({:message_attempt_timeout, message}, state) do
+    { :noreply, update_specific_element(state, message, &(increase_number_of_attempts(&1))) }
   end
 end
