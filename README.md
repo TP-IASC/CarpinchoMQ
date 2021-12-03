@@ -68,6 +68,7 @@ Por otro lado, los receptores de la cola de mensajes podrán optar por dos modal
 
 * Consumo transaccional:
   CarpinchoMQ coinsidera que fue un consumo exitoso del mensaje tras la confirmacion por parte del receptor que lo proceso completo (se envia el ACK luego de haber completado el procesamiento del mensaje).
+
 Si el receptor no envia la confirmacion en determinado tiempo, por timeout se coinsidera que el consumo fallo.
 
   En este caso Carpincho hara lo siguiente:
