@@ -39,10 +39,9 @@
       <a href="#empezando">Empezando</a>
       <ul>
         <li><a href="#prerequisites">Prerequisitos</a></li>
-        <li><a href="#installation">Instalacion</a></li>
+        <li><a href="#usage">Uso</a></li>
       </ul>
     </li>
-    <li><a href="#usage">Uso</a></li>
     <li><a href="#contributing">Contribuciones</a></li>
     <li><a href="#licencia">Licencia</a></li>
     <li><a href="#contact">Contactos</a></li>
@@ -88,8 +87,6 @@ CarpinchoMQ nacio gracias a:
 * [Phoenix](https://www.phoenixframework.org/)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
 
 <!-- GETTING STARTED -->
 ## Empezando
@@ -144,10 +141,6 @@ Queue.alive? <nombre_cola>
  ``` 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-
 
 <!-- CONTRIBUTING -->
 ## Contributing
