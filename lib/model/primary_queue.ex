@@ -49,28 +49,19 @@ defmodule PrimaryQueue do
     end
   end
 
-  def handle_info({:message_attempt_timeout, message}, _from, state) do
-    # ver primero si el mensaje sigue existiendo
-      # si no existe no hago nada
-      # si existe:
-        # ver la lista de suscribers que no contestaron el mensaje
-         # si esta vacia no hago nada
-         # si no esta vacia
-            # si la cantidad de envios de ese mensaje es = 5
-              # elimino el mensaje (lo descarto) y loggeo que ya lo reintente 5 veces
-            # si es menor a 5
-              # le reenvio el mensaje a todos esos suscriptores y vuelvo a tirar el schedule_retry_call
+  def handle_info({:message_attempt_timeout, message}, state) do
     Logger.info("Voy a reintentar el envio del mensajeeee")
     queue_name = state.name
-    new_state = state
+
     if Enum.any?(state.elements, fn element -> element.message == message end) do
-      element = Enum.find(state.elements, fn element -> element.message == message end).consumers_that_did_not_ack
+      element = Enum.find(state.elements, fn element -> element.message == message end)
       unless Enum.empty?(element.consumers_that_did_not_ack) do
         if element.number_of_attempts == 5 do
           Logger.error "discarding message after sending it 5 times"
           Queue.cast(state.name, {:delete, element})
+          {:noreply, state}
         else
-          ^new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
+          new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
             if element.message == message do
               Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
             else
@@ -80,11 +71,15 @@ defmodule PrimaryQueue do
           Enum.each(element.consumers_that_did_not_ack, fn consumer ->
             Consumer.cast(consumer, { :send_message, message, consumer, queue_name })
           end)
-          schedule_retry_call(queue_name, message)
+          schedule_retry_call(message)
+          {:noreply, new_state}
         end
+      else
+        {:noreply, state}
       end
+    else
+      {:noreply, state}
     end
-    {:noreply, new_state}
   end
 
   def handle_cast({:send_ack, message, consumer_pid}, state) do
@@ -99,11 +94,14 @@ defmodule PrimaryQueue do
     end))
 
     elem = Enum.find(new_state.elements, fn element -> element.message == message end)
-    if Enum.empty?(elem.consumers_that_did_not_ack) do
-      Queue.cast(state.name, {:delete, elem})
+    unless elem == nil do
+      if Enum.empty?(elem.consumers_that_did_not_ack) do
+        Queue.cast(state.name, {:delete, elem})
+      end
+
+      send_to_replica(state.name, { :send_ack, message, consumer_pid })
     end
 
-    send_to_replica(state.name, { :send_ack, message, consumer_pid })
     { :noreply, new_state }
   end
 
@@ -123,7 +121,7 @@ defmodule PrimaryQueue do
       Enum.each(queue_subscribers, fn subscriber ->
         Consumer.cast(subscriber, { :send_message, message, subscriber, queue_name })
       end)
-      schedule_retry_call(queue_name, message)
+      schedule_retry_call(message)
       { :noreply, add_receivers_to_state_message(state, queue_subscribers, message) }
     end
   end
@@ -145,7 +143,8 @@ defmodule PrimaryQueue do
       |> Queue.cast(request)
   end
 
-  defp schedule_retry_call(queue_name, message) do
-    Process.send_after(self(), {:message_attempt_timeout, message}, 10)
+  defp schedule_retry_call(message) do
+    Logger.info("Scheduling a retry call")
+    Process.send_after(self(), {:message_attempt_timeout, message}, 2000)
   end
 end
