@@ -55,19 +55,15 @@ defmodule PrimaryQueue do
     queue_name = state.name
 
     element = get_element_by_message(state, message)
-    unless element == nil do
-      unless Enum.empty?(element.consumers_that_did_not_ack) do
-        if element.number_of_attempts == 5 do
-          Logger.error "discarding message after sending it 5 times"
-          Queue.cast(state.name, {:delete, element})
-          {:noreply, state}
-        else
-          new_state = update_specific_element(state, message, &(increase_number_of_attempts(&1)))
-          send_message_to(message, element.consumers_that_did_not_ack, queue_name)
-          {:noreply, new_state}
-        end
-      else
+    unless element == nil or Enum.empty?(element.consumers_that_did_not_ack) do
+      if element.number_of_attempts == 5 do
+        Logger.error "discarding message after sending it 5 times"
+        Queue.cast(state.name, {:delete, element})
         {:noreply, state}
+      else
+        new_state = update_specific_element(state, message, &(increase_number_of_attempts(&1)))
+        send_message_to(message, element.consumers_that_did_not_ack, queue_name)
+        {:noreply, new_state}
       end
     else
       {:noreply, state}
@@ -101,7 +97,7 @@ defmodule PrimaryQueue do
     queue_name = state.name
     all_subscribers = state.subscribers
     if Enum.empty?(all_subscribers) do
-      Logger.warning("The queue \"#{queue_name}\" has not subscribers to send the message")
+      Logger.warning("The queue #{queue_name} has not subscribers to send the message")
       { :noreply, state }
     else
       send_message_to(message, all_subscribers, queue_name)
@@ -134,7 +130,7 @@ defmodule PrimaryQueue do
 
   defp schedule_retry_call(message) do
     Logger.info("Scheduling a retry call")
-    Process.send_after(self(), {:message_attempt_timeout, message}, 2000)
+    Process.send_after(self(), {:message_attempt_timeout, message}, 4000)
   end
 
   defp update_specific_element(state, message, update_element) do
