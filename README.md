@@ -97,35 +97,56 @@ CarpinchoMQ nacio gracias a:
 ### Prerequisitos
 
 Debemos tener instalado:
-* Elixir.
-* Docker.
-
-### Instalacion
-
-_Intrucciones para instalar CarpinchoMQ._
-
-1. Instruccion 1
-2. Instruccion 2
-   ```sh
-   git clone https://github.com/your_username_/Project-Name.git
-   ```
-3. Instruccion n
-   ```sh
-   npm install
-   ```
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
+* Visual Studio Code (recomendacion para levantar el proyecto).
+* [Elixir](https://elixir-lang.org/install.html) 
+* Horde, en caso de error al levantar el proyecto usar el comando:
+```sh
+mix deps.get
+ ```
 
 <!-- USAGE EXAMPLES -->
 ## Uso
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+Para utilizar CarpinchoMQ debes levantar lineas de comando.
+A continuacion te pasamos los comandos:
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+* Levantar un nodo nuevo en una consola (para tirarlo abajo Ctrl+C): 
+ ```sh
+   iex --sname <nombre_nodo> -S mix 
+   ``` 
+* Crear una cola nueva: 
+```sh
+Producer.new_queue <nombre_cola>
+  ``` 
+* Pushear un mensaje a la cola: 
+```sh
+Producer.push_message <nombre_cola>,<mensaje>
+  ``` 
+* Crear un Consumidor: 
+```sh
+{:ok, pid} = Consumer.start_link
+ ``` 
+* Suscribir un consumidor a una cola: 
+```sh
+Consumer.subscribe <nombre_cola>,<pid_consumidor>
+ ``` 
+* Desuscribir un consumidor de una cola: 
+```sh
+Consumer.unsubscribe <nombre_cola>,<pid_consumidor>
+ ``` 
+* Ver el estado de una cola: 
+```sh
+Queue.state <nombre_cola>
+ ``` 
+* Ver si una cola está viva: 
+```sh
+Queue.alive? <nombre_cola>
+ ``` 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
+
+
+
 
 
 <!-- CONTRIBUTING -->
