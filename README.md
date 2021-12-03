@@ -82,9 +82,12 @@ Si el receptor no envia la confirmacion en determinado tiempo, por timeout se co
 
 CarpinchoMQ nacio gracias a:
 
+
 * [elixir.ex](https://elixir-lang.org/)
 * [horde](https://hexdocs.pm/horde/getting_started.html)
-* [Phoenix](https://www.phoenixframework.org/)
+
+* [Node.js](https://nodejs.org/es/)
+* [React.js](https://es.reactjs.org/)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
