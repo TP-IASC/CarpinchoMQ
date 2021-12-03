@@ -38,14 +38,14 @@
     <li>
       <a href="#empezando">Empezando</a>
       <ul>
-        <li><a href="#prerequisites">Prerequisitos</a></li>
-        <li><a href="#usage">Uso</a></li>
+        <li><a href="#prerequisitos">Prerequisitos</a></li>
+        <li><a href="#uso">Uso</a></li>
       </ul>
     </li>
-    <li><a href="#contributing">Contribuciones</a></li>
     <li><a href="#licencia">Licencia</a></li>
-    <li><a href="#contact">Contactos</a></li>
-    <li><a href="#acknowledgments">Fuentes</a></li>
+    <li><a href="#fuentes">Fuentes</a></li>
+    <li><a href="#agradecimientos">Agradecimientos</a></li>
+  </ol>
   </ol>
 </details>
 
@@ -113,11 +113,17 @@ A continuacion te pasamos los comandos:
 
 * Levantar un nodo nuevo en una consola (para tirarlo abajo Ctrl+C): 
  ```sh
-   iex --sname <nombre_nodo> -S mix 
+  iex --sname <nombre_nodo> -S mix 
+   ``` 
+ ```sh
+  iex --sname "a" -S mix 
    ``` 
 * Crear una cola nueva: 
 ```sh
-Producer.new_queue <nombre_cola>
+Producer.new_queue <nombre_cola, mensajes_maximos, modo_de_trabajo>
+  ``` 
+  ```sh
+Producer.new_queue :cola1, 23, :publish_subscribe
   ``` 
 * Pushear un mensaje a la cola: 
 ```sh
