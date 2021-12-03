@@ -25,7 +25,8 @@ defmodule PrimaryQueue do
 
       if state.work_mode == :publish_subscribe, do: Queue.cast(state.name, {:send_to_subscribers, new_message})
 
-      { :reply, OK.success(:message_queued), Map.put(state, :elements, [%{message: new_message, consumers_that_did_not_ack: [], number_of_attempts: 0}|state.elements]) }
+      new_element = %{message: new_message, consumers_that_did_not_ack: [], number_of_attempts: 0}
+      { :reply, OK.success(:message_queued), Map.put(state, :elements, [new_element|state.elements]) }
     end
   end
 
@@ -53,25 +54,16 @@ defmodule PrimaryQueue do
     Logger.info("Voy a reintentar el envio del mensajeeee")
     queue_name = state.name
 
-    if Enum.any?(state.elements, fn element -> element.message == message end) do
-      element = Enum.find(state.elements, fn element -> element.message == message end)
+    element = get_element_by_message(state, message)
+    unless element == nil do
       unless Enum.empty?(element.consumers_that_did_not_ack) do
         if element.number_of_attempts == 5 do
           Logger.error "discarding message after sending it 5 times"
           Queue.cast(state.name, {:delete, element})
           {:noreply, state}
         else
-          new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
-            if element.message == message do
-              Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
-            else
-              element
-            end
-          end))
-          Enum.each(element.consumers_that_did_not_ack, fn consumer ->
-            Consumer.cast(consumer, { :send_message, message, consumer, queue_name })
-          end)
-          schedule_retry_call(message)
+          new_state = update_specific_element(state, message, &(increase_number_of_attempts(&1)))
+          send_message_to(message, element.consumers_that_did_not_ack, queue_name)
           {:noreply, new_state}
         end
       else
@@ -85,18 +77,12 @@ defmodule PrimaryQueue do
   def handle_cast({:send_ack, message, consumer_pid}, state) do
     Logger.info "Me llego un ack de #{inspect consumer_pid}"
     # ver que pasa si un consumer contesta 2 veces
-    new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
-      else
-        element
-      end
-    end))
+    new_state = update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, consumer_pid)))
 
-    elem = Enum.find(new_state.elements, fn element -> element.message == message end)
-    unless elem == nil do
-      if Enum.empty?(elem.consumers_that_did_not_ack) do
-        Queue.cast(state.name, {:delete, elem})
+    element = get_element_by_message(new_state, message)
+    unless element == nil do
+      if Enum.empty?(element.consumers_that_did_not_ack) do
+        Queue.cast(state.name, {:delete, element})
       end
 
       send_to_replica(state.name, { :send_ack, message, consumer_pid })
@@ -113,29 +99,32 @@ defmodule PrimaryQueue do
 
   def handle_cast({:send_to_subscribers, message}, state) do
     queue_name = state.name
-    queue_subscribers = state.subscribers
-    if Enum.empty?(queue_subscribers) do
+    all_subscribers = state.subscribers
+    if Enum.empty?(all_subscribers) do
       Logger.warning("The queue \"#{queue_name}\" has not subscribers to send the message")
       { :noreply, state }
     else
-      Enum.each(queue_subscribers, fn subscriber ->
-        Consumer.cast(subscriber, { :send_message, message, subscriber, queue_name })
-      end)
-      schedule_retry_call(message)
-      { :noreply, add_receivers_to_state_message(state, queue_subscribers, message) }
+      send_message_to(message, all_subscribers, queue_name)
+      { :noreply, add_receivers_to_state_message(state, all_subscribers, message) }
     end
+  end
+
+  defp send_message_to(message, subscribers, queue_name) do
+    Enum.each(subscribers, fn subscriber ->
+      Consumer.cast(subscriber, { :send_message, message, subscriber, queue_name })
+    end)
+    schedule_retry_call(message)
   end
 
   defp add_receivers_to_state_message(state, subscribers, message) do
     send_to_replica(state.name, { :add_receivers_to_state_message, subscribers, message })
-    Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        updated_element = Map.put(element, :consumers_that_did_not_ack, subscribers)
-        Map.put(updated_element, :number_of_attempts, 1)
-      else
-        element
-      end
-    end))
+    update_specific_element(state, message, &(init_element(&1, subscribers)))
+  end
+
+  defp init_element(element, subscribers) do
+    element
+      |> Map.put(:consumers_that_did_not_ack, subscribers)
+      |> increase_number_of_attempts
   end
 
   defp send_to_replica(queue_name, request) do
@@ -147,4 +136,18 @@ defmodule PrimaryQueue do
     Logger.info("Scheduling a retry call")
     Process.send_after(self(), {:message_attempt_timeout, message}, 2000)
   end
+
+  defp update_specific_element(state, message, update_element) do
+    Map.put(state, :elements, Enum.map(state.elements, fn element ->
+      if element.message == message do update_element.(element) else element end
+    end))
+  end
+
+  defp update_consumers_that_did_not_ack(element, consumer_pid) do
+    Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
+  end
+
+  defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
+
+  defp get_element_by_message(state, message), do: Enum.find(state.elements, &(&1.message == message))
 end
