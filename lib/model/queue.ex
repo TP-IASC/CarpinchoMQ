@@ -44,7 +44,7 @@ defmodule Queue do
         Map.put(state, :elements, [new_element | state.elements])
       end
 
-      def update_next_subscriber(state, next_subscriber_to_send) do
+      defp update_next_subscriber(state, next_subscriber_to_send) do
         Map.put(state, :next_subscriber_to_send, next_subscriber_to_send)
       end
 

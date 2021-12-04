@@ -120,19 +120,26 @@ defmodule PrimaryQueue do
     queue_name = state.name
     all_subscribers = state.subscribers
     if Enum.empty?(all_subscribers) do
-      Logger.warning "The queue #{queue_name} has not subscribers to send the message #{message.payload}"
+      Logger.warning "The queue #{queue_name} has no subscribers to send the message #{message.payload}"
       {:noreply, state}
     end
     if length(all_subscribers) == state.next_subscriber_to_send + 1  do
       subscriber_to_send = Enum.at(all_subscribers, 0)
       send_message_to(message, [subscriber_to_send], queue_name)
-      {:noreply, add_receivers_to_state_message(state, [subscriber_to_send], message), update_next_subscriber(state, 1)}
+      new_state = update_next_subscriber(state, 1)
+                  |> add_receivers_to_state_message([subscriber_to_send], message)
+      {
+        :noreply,
+        new_state
+      }
     else
       subscriber_to_send = Enum.at(all_subscribers, state.next_subscriber_to_send)
       send_message_to(message, [subscriber_to_send], queue_name)
+      new_state = update_next_subscriber(state, state.next_subscriber_to_send + 1)
+                  |> add_receivers_to_state_message([subscriber_to_send], message)
       {
         :noreply,
-        add_receivers_to_state_message(Queue.update_next_subscriber(state, next_subscriber_to_send + 1), [subscriber_to_send], message)
+        new_state
       }
     end
   end
