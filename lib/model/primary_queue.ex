@@ -132,8 +132,7 @@ defmodule PrimaryQueue do
       send_message_to(message, [subscriber_to_send], queue_name)
       {
         :noreply,
-        add_receivers_to_state_message(state, [subscriber_to_send], message),
-        update_next_subscriber(state, next_subscriber_to_send + 1)
+        add_receivers_to_state_message(Queue.update_next_subscriber(state, next_subscriber_to_send + 1), [subscriber_to_send], message)
       }
     end
   end
