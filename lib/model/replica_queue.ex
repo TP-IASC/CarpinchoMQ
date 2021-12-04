@@ -3,14 +3,21 @@ defmodule ReplicaQueue do
   require Logger
 
   def init(default_state) do
-    Logger.info "Queue: #{default_state.name} started"
+    info(default_state.name, "queue started")
     Process.flag(:trap_exit, true)
     { :ok, default_state }
   end
 
   def handle_continue(:check_replica, default_state) do
     primary = Queue.primary_name(default_state.name)
-    state = if Queue.alive?(primary), do: Queue.state(primary) |> Map.put(:name, default_state.name), else: default_state
+
+    state = if Queue.alive?(primary) do
+      debug(default_state.name, "restored from primary queue")
+      Queue.state(primary) |> Map.put(:name, default_state.name)
+    else
+      default_state
+    end
+
     { :noreply, state }
   end
 
@@ -22,12 +29,12 @@ defmodule ReplicaQueue do
     { :noreply, Map.put(state, :elements, List.delete(state.elements, element)) }
   end
 
-  def handle_cast({:subscribe, pid}, state) do
-    { :noreply, Map.put(state, :subscribers, [pid|state.subscribers]) }
+  def handle_cast({:subscribe, consumer}, state) do
+    { :noreply, Map.put(state, :subscribers, [consumer|state.subscribers]) }
   end
 
-  def handle_cast({:unsubscribe, pid}, state) do
-    { :noreply, Map.put(state, :subscribers, List.delete(state.subscribers, pid)) }
+  def handle_cast({:unsubscribe, consumer}, state) do
+    { :noreply, Map.put(state, :subscribers, List.delete(state.subscribers, consumer)) }
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
@@ -40,10 +47,10 @@ defmodule ReplicaQueue do
     end)) }
   end
 
-  def handle_cast({:send_ack, message, consumer_pid}, state) do
+  def handle_cast({:ack, message_id, consumer}, state) do
     { :noreply, Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
+      if element.message.id == message_id do
+        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer))
       else
         element
       end

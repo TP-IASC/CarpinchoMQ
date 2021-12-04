@@ -27,13 +27,28 @@ defmodule Queue do
 
       # Por ahi conviene que sea call para que el proceso que envia la request tenga una confirmacion de recepcion
       def handle_cast({:horde, :resolve_conflict, remote_state}, state) do
-        Logger.info "Resolving conflicts in #{state.name}..."
+        info(state.name, "resolving conflicts")
         new_state = Map.put(state, :elements, Queue.merge_queues(state.elements, remote_state.elements))
         { :noreply, new_state }
       end
 
       def handle_call(:get, _from, state) do
         { :reply, state, state }
+      end
+
+      defp log_message(queue_name, message),
+        do: "[QUEUE] [#{Atom.to_string(queue_name)}] #{message}"
+
+      defp debug(queue_name, message) do
+        log_message(queue_name, message) |> Logger.debug
+      end
+
+      defp info(queue_name, message) do
+        log_message(queue_name, message) |> Logger.info
+      end
+
+      defp warning(queue_name, message) do
+        log_message(queue_name, message) |> Logger.warning
       end
     end
   end
