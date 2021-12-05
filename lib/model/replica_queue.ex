@@ -34,6 +34,10 @@ defmodule ReplicaQueue do
     { :noreply, update_specific_element(state, message, &(init_element(&1, subscribers))) }
   end
 
+  def handle_cast({:update_next_subscriber_to_send, next_subscriber_to_send}, state) do
+    { :noreply, update_next_subscriber(state, next_subscriber_to_send) }
+  end
+
   def handle_cast({:send_ack, message, consumer_pid}, state) do
     { :noreply, update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, consumer_pid))) }
   end

@@ -57,11 +57,14 @@ defmodule PrimaryQueue do
 
     element = get_element_by_message(state, message)
     unless element == nil or Enum.empty?(element.consumers_that_did_not_ack) do
-      if element.number_of_attempts == 5 and state.work_mode == :publish_subscribe do
-        Logger.error "Discarding message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{
+      if rem(element.number_of_attempts, 5) == 0 do
+        Logger.error "Handling message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{
           inspect element.consumers_that_did_not_ack
         }"
-        Queue.cast(state.name, {:delete, element})
+        case state.work_mode do
+          :publish_subscribe -> Queue.cast(state.name, {:delete, element})
+          :work_queue -> Queue.cast(state.name, {:send_to_subscriber, message})
+        end
         {:noreply, state}
       else
         new_state = update_specific_element(state, message, &(increase_number_of_attempts(&1)))
@@ -72,9 +75,6 @@ defmodule PrimaryQueue do
         Logger.info "#{state.name}"
         send_to_replica(state.name, {:message_attempt_timeout, message})
         {:noreply, new_state}
-      end
-      if element.number_of_attempts == 5 and state.work_mode == :work_mode do
-        Queue.cast(state.name, {:send_to_subscriber, message})
       end
     else
       {:noreply, state}
@@ -160,6 +160,11 @@ defmodule PrimaryQueue do
     update_specific_element(state, message, &(init_element(&1, subscribers)))
   end
 
+  defp update_next_subscribers_and_replica(state, next_subscriber_to_send) do
+    send_to_replica(state.name, {:update_next_subscriber_to_send, next_subscriber_to_send})
+    update_next_subscriber(state, next_subscriber_to_send)
+  end
+
   defp send_to_replica(queue_name, request) do
     Queue.replica_name(queue_name)
     |> Queue.cast(request)
@@ -172,7 +177,7 @@ defmodule PrimaryQueue do
   defp check_work_mode(state, new_message) do
     case state.work_mode do
       :publish_subscribe -> Queue.cast(state.name, {:send_to_subscribers, new_message})
-      :work_mode -> Queue.cast(state.name, {:send_to_subscriber, new_message})
+      :work_queue -> Queue.cast(state.name, {:send_to_subscriber, new_message})
     end
     {:noreply, state}
   end

@@ -10,7 +10,7 @@
 # Round robin
 * El procedimiento es similar, crear una cola en modo round_robin/work_mode, y en el nodo 2 crear 2 consumidores.
 ```
-Producer.new_queue :cola1, 23, :work_mode
+Producer.new_queue :cola1, 23, :work_queue
 {:ok, pid} = Consumer.start_link
 Consumer.subscribe :cola1, pid
 {:ok, pid2} = Consumer.start_link
