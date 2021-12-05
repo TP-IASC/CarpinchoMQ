@@ -9,7 +9,7 @@ defmodule App do
       App.HordeRegistry,
       { App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] },
       App.NodeObserver.Supervisor,
-      {Plug.Cowboy, scheme: :http, plug:  HTTPServer, options: [port: http_port]}
+      {HTTPServerSupervisor, http_port}
 
     ]
 

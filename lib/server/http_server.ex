@@ -1,9 +1,6 @@
 defmodule HTTPServer do
   use Plug.Router
   import Plug.Conn
-#  import Queue
-  import Logger
-
 
   plug :match
   plug Plug.Parsers, parsers: [:json],
@@ -11,24 +8,41 @@ defmodule HTTPServer do
   plug :dispatch
 
 
-
   @queue "queue_name"
 
 
-  get "/queue/state" do
+  get "/queue/:name/state" do
     conn = fetch_query_params(conn)
-    %{ @queue => name} = conn.params
+
     atom_name = String.to_atom(name)
+    state = Queue.state(atom_name)
 
-    state_json = Queue.state(atom_name) |> Poison.encode!
-
-    send_resp(conn, 200, state_json)
+    send_resp(conn, 200, state |> Poison.encode!)
   end
+
+  get "/queue/:name/state/elements" do
+    conn = fetch_query_params(conn)
+
+    atom_name = String.to_atom(name)
+    elements = Queue.state(atom_name) |> Map.get(:elements, "") |> Poison.encode!
+
+    send_resp(conn, 200, elements)
+  end
+
+  get "/queue" do
+    conn = fetch_query_params(conn)
+
+    names = Utils.show_registry |> Enum.map( fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
+    names_without_replica = names |> Enum.filter(fn(n) -> !String.contains?(n, "_replica") end) |> Poison.encode!
+
+    send_resp(conn, 200, names_without_replica)
+  end
+
 
   @size "max_size"
   @mode "work_mode"
 
-  post "/queue/new" do
+  post "/queue" do
 
     %{ @queue => name, @size => max_size, @mode => work_mode} = conn.body_params
     atom_name = String.to_atom(name)
@@ -41,7 +55,7 @@ defmodule HTTPServer do
 
   @message "message"
 
-  post "/queue/message" do
+  post "/queue/state/messages" do
 
     %{ @queue => name, @message => message} = conn.body_params
     atom_name = String.to_atom(name)
@@ -51,9 +65,4 @@ defmodule HTTPServer do
     send_resp(conn, 200, "Success!")
   end
 
-
-
- # match _ do
-  #  send_resp(conn, 404, "oops")
-  #end
 end

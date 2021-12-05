@@ -88,6 +88,12 @@ defmodule Queue do
     |> GenServer.call(request)
   end
 
+  def all do
+
+   elem = Supervisor.which_children(App.HordeSupervisor) |> Enum.map(fn {_, x,_,_} -> x end) |> List.first
+   IO.inspect(elem)
+      Process.info(elem)
+  end
   def new(queue_name, max_size, work_mode) do
     OK.for do
       _ <- check_name(queue_name)
