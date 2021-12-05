@@ -31,87 +31,111 @@ defmodule PrimaryQueue do
 
       if state.work_mode == :publish_subscribe, do: Queue.cast(state.name, {:send_to_subscribers, new_message})
 
-      { :reply, OK.success(:message_queued), Map.put(state, :elements, [%{message: new_message, consumers_that_did_not_ack: []}|state.elements]) }
+      { :reply, OK.success(:message_queued), add_new_element(state, new_message) }
     end
   end
 
   def handle_call({:subscribe, consumer}, _from, state) do
-    if Enum.member?(state.subscribers, consumer) do
+    if is_subscriber?(consumer, state) do
       { :reply, :already_subscribed, state }
     else
       send_to_replica(state.name, { :subscribe, consumer })
       debug(state.name, "subscribed #{inspect(consumer)}")
-      { :reply, :subscribed, Map.put(state, :subscribers, [consumer|state.subscribers]) }
+      { :reply, :subscribed, add_subscriber(state, consumer) }
     end
   end
 
-  def handle_call({:unsubscribe, consumer}, _from, state) do
-    unless Enum.member?(state.subscribers, consumer) do
+  def handle_call({:unsubscribe, subscriber}, _from, state) do
+    unless is_subscriber?(subscriber, state) do
       { :reply, :not_subscribed, state }
     else
-      send_to_replica(state.name, { :unsubscribe, consumer })
-      debug(state.name, "unsubscribed #{inspect(consumer)}")
-      { :reply, :unsubscribed, Map.put(state, :subscribers, List.delete(state.subscribers, consumer)) }
+      send_to_replica(state.name, { :unsubscribe, subscriber })
+      debug(state.name, "unsubscribed #{inspect(subscriber)}")
+      { :reply, :unsubscribed, remove_subscriber(state, subscriber) }
+    end
+  end
+
+  def handle_info({:message_attempt_timeout, message}, state) do
+    queue_name = state.name
+
+    element = get_element_by_message(state, message)
+    unless element == nil or Enum.empty?(element.consumers_that_did_not_ack) do
+      if element.number_of_attempts == 5 do
+        warning(state.name, "Discarding message #{inspect(message)} after sending it 5 times. Consumers that didn't answer: #{inspect element.consumers_that_did_not_ack}.")
+        Queue.cast(state.name, {:delete, element})
+        {:noreply, state}
+      else
+        new_state = update_specific_element(state, message.id, &(increase_number_of_attempts(&1)))
+        debug(state.name, "retrying send message #{message.id} to consumers: #{inspect element.consumers_that_did_not_ack}. Attempt Nr. #{element.number_of_attempts + 1}")
+        send_message_to(message, element.consumers_that_did_not_ack, queue_name)
+        send_to_replica(state.name, {:message_attempt_timeout, message})
+        {:noreply, new_state}
+      end
+    else
+      {:noreply, state}
     end
   end
 
   def handle_cast({:ack, message_id, consumer}, state) do
-    new_state = Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message.id == message_id do
-        debug(state.name, "message #{message_id} acknowledged by #{inspect(consumer)}")
-        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer))
-      else
-        element
-      end
-    end))
+    new_state = update_specific_element(state, message_id, &(update_consumers_that_did_not_ack(&1, consumer)))
 
-    elem = Enum.find(new_state.elements, fn element -> element.message.id == message_id end)
-    if Enum.empty?(elem.consumers_that_did_not_ack) do
-      Queue.cast(state.name, {:delete, elem})
+    element = get_element_by_message(new_state, message_id)
+    unless element == nil do
+      debug(state.name, "message #{message_id} acknowledged by #{inspect(consumer)}")
+      if Enum.empty?(element.consumers_that_did_not_ack) do
+        debug(state.name, "message #{message_id} received all ACKs")
+        Queue.cast(state.name, {:delete, element})
+      end
+
+      send_to_replica(state.name, { :ack, message_id, consumer })
     end
 
-    send_to_replica(state.name, { :ack, message_id, consumer })
     { :noreply, new_state }
   end
 
-  def handle_cast({:delete, elem}, state) do
-    debug(state.name, "message #{inspect(elem.message)} deleted")
-    send_to_replica(state.name, {:delete, elem})
-    { :noreply, Map.put(state, :elements, List.delete(state.elements, elem)) }
+  def handle_cast({:delete, element}, state) do
+    send_to_replica(state.name, {:delete, element})
+    debug(state.name, "message #{inspect(element.message)} deleted")
+    { :noreply, delete_element(state, element) }
   end
 
   def handle_cast({:send_to_subscribers, message}, state) do
     queue_name = state.name
-    queue_subscribers = state.subscribers
-    if Enum.empty?(queue_subscribers) do
+    all_subscribers = state.subscribers
+    if Enum.empty?(all_subscribers) do
       warning(queue_name, "not enough subscribers to send the message")
       { :noreply, state }
     else
-      Enum.each(queue_subscribers, fn subscriber ->
-        send_to_subscriber(queue_name, message, subscriber)
-      end)
-      { :noreply, add_receivers_to_state_message(state, queue_subscribers, message) }
+      send_message_to(message, all_subscribers, queue_name)
+      { :noreply, add_receivers_to_state_message(state, all_subscribers, message) }
     end
+  end
+
+  defp is_subscriber?(consumer, state) do
+    Enum.member?(state.subscribers, consumer)
+  end
+
+  defp send_message_to(message, subscribers, queue_name) do
+    Enum.each(subscribers, fn subscriber ->
+      debug(queue_name, "message #{inspect(message)} sent to #{inspect(subscriber)}")
+      GenServer.cast(UDPServer, { :send_message, queue_name, message, subscriber })
+    end)
+    schedule_retry_call(message)
   end
 
   defp add_receivers_to_state_message(state, subscribers, message) do
     send_to_replica(state.name, { :add_receivers_to_state_message, subscribers, message })
-    Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, subscribers)
-      else
-        element
-      end
-    end))
-  end
-
-  defp send_to_subscriber(queue_name, message, subscriber) do
-    debug(queue_name, "message #{inspect(message)} sent to #{inspect(subscriber)}")
-    GenServer.cast(UDPServer, { :send_message, queue_name, message, subscriber })
+    update_specific_element(state, message, &(init_element(&1, subscribers)))
   end
 
   defp send_to_replica(queue_name, request) do
     Queue.replica_name(queue_name)
       |> Queue.cast(request)
   end
+
+  defp schedule_retry_call(message) do
+    Process.send_after(self(), {:message_attempt_timeout, message}, 4000)
+  end
+
+  defp get_element_by_message(state, message_id), do: Enum.find(state.elements, &(&1.message.id == message_id))
 end
