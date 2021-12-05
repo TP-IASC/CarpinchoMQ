@@ -8,3 +8,17 @@
 * En cuanto lleguen los 2 acks, se va a eliminar el mensaje de la cola, por lo que si volvemos a consultar el estado de la cola este no tendrá elementos. (si un consumidor no respondiera con ack, el mensaje nunca se borraria de la cola)
 
 # Round robin
+* El procedimiento es similar, crear una cola en modo round_robin/work_mode, y en el nodo 2 crear 2 consumidores.
+```
+Producer.new_queue :cola1, 23, :work_mode
+{:ok, pid} = Consumer.start_link
+Consumer.subscribe :cola1, pid
+{:ok, pid2} = Consumer.start_link
+Consumer.subscribe :cola1, pid2
+```
+* Despues mandamos un mensaje y podemos ver el estado (si seteamos el timeout)
+```
+Producer.push_message :cola1, "Holaa"
+Queue.state :cola1
+```
+* En cuanto llegue el ack, se va a eliminar el mensaje de la cola. Si no llega el ack despues de 5 intentos, se manda el mensaje al proximo consumidor hasta que uno lo consuma.

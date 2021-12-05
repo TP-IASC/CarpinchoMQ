@@ -26,8 +26,7 @@ defmodule PrimaryQueue do
 
       send_to_replica(state.name, {:push, new_message})
 
-      if state.work_mode == :publish_subscribe, do: Queue.cast(state.name, {:send_to_subscribers, new_message})
-      if state.work_mode == :round_robin, do: Queue.cast(state.name, {:send_to_subscriber, new_message})
+      check_work_mode(state, new_message)
 
       {:reply, OK.success(:message_queued), add_new_element(state, new_message)}
     end
@@ -70,10 +69,11 @@ defmodule PrimaryQueue do
           inspect element.consumers_that_did_not_ack
         }. Attempt Nr. #{element.number_of_attempts + 1}"
         send_message_to(message, element.consumers_that_did_not_ack, queue_name)
+        Logger.info "#{state.name}"
         send_to_replica(state.name, {:message_attempt_timeout, message})
         {:noreply, new_state}
       end
-      if element.number_of_attempts == 5 and state.work_mode == :round_robin do
+      if element.number_of_attempts == 5 and state.work_mode == :work_mode do
         Queue.cast(state.name, {:send_to_subscriber, message})
       end
     else
@@ -149,12 +149,9 @@ defmodule PrimaryQueue do
   end
 
   defp send_message_to(message, subscribers, queue_name) do
-    Enum.each(
-      subscribers,
-      fn subscriber ->
-        Consumer.cast(subscriber, {:send_message, message, subscriber, queue_name})
-      end
-    )
+    Enum.each(subscribers, fn subscriber ->
+      Consumer.cast(subscriber, { :send_message, message, subscriber, queue_name })
+    end)
     schedule_retry_call(message)
   end
 
@@ -170,6 +167,14 @@ defmodule PrimaryQueue do
 
   defp schedule_retry_call(message) do
     Process.send_after(self(), {:message_attempt_timeout, message}, 4000)
+  end
+
+  defp check_work_mode(state, new_message) do
+    case state.work_mode do
+      :publish_subscribe -> Queue.cast(state.name, {:send_to_subscribers, new_message})
+      :work_mode -> Queue.cast(state.name, {:send_to_subscriber, new_message})
+    end
+    {:noreply, state}
   end
 
   defp get_element_by_message(state, message), do: Enum.find(state.elements, &(&1.message == message))
