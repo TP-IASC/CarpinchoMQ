@@ -118,7 +118,7 @@ defmodule PrimaryQueue do
 
   defp add_receivers_to_state_message(state, subscribers, message) do
     send_to_replica(state.name, { :add_receivers_to_state_message, subscribers, message })
-    update_specific_element(state, message, &(init_element(&1, subscribers)))
+    update_specific_element(state, message, &(init_sent_element_props(&1, subscribers)))
   end
 
   defp send_to_replica(queue_name, request) do

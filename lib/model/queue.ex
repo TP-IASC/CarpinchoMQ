@@ -63,7 +63,7 @@ defmodule Queue do
         Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
       end
 
-      defp init_element(element, subscribers) do
+      defp init_sent_element_props(element, subscribers) do
         element
           |> Map.put(:consumers_that_did_not_ack, subscribers)
           |> increase_number_of_attempts
