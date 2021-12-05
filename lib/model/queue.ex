@@ -55,12 +55,12 @@ defmodule Queue do
         Map.put(state, :subscribers, [subscriber|state.subscribers])
       end
 
-      defp remove_subscriber(state, subscriber) do
-        Map.put(state, :subscribers, List.delete(state.subscribers, subscriber))
+      defp remove_subscribers(state, subscribers) do
+        Map.put(state, :subscribers, state.subscribers -- subscribers)
       end
 
-      defp update_consumers_that_did_not_ack(element, consumer_pid) do
-        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
+      defp update_consumers_that_did_not_ack(element, consumers) do
+        Map.put(element, :consumers_that_did_not_ack, element.consumers_that_did_not_ack -- consumers)
       end
 
       defp init_sent_element_props(element, subscribers) do
@@ -70,6 +70,17 @@ defmodule Queue do
       end
 
       defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
+
+      defp delete_subscribers(state, subscribers_to_delete) do
+        new_state = remove_subscribers(state, subscribers_to_delete)
+        delete_subscribers_from_all_elements(new_state, subscribers_to_delete)
+      end
+
+      defp delete_subscribers_from_all_elements(state, subscribers_to_delete) do
+        Map.put(state, :elements, Enum.map(state.elements, fn element ->
+          update_consumers_that_did_not_ack(element, subscribers_to_delete)
+        end))
+      end
     end
   end
 

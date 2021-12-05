@@ -27,7 +27,7 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:unsubscribe, pid}, state) do
-    { :noreply, remove_subscriber(state, pid) }
+    { :noreply, remove_subscribers(state, [pid]) }
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
@@ -35,10 +35,14 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:send_ack, message, consumer_pid}, state) do
-    { :noreply, update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, consumer_pid))) }
+    { :noreply, update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, [consumer_pid]))) }
   end
 
   def handle_cast({:message_attempt_timeout, message}, state) do
     { :noreply, update_specific_element(state, message, &(increase_number_of_attempts(&1))) }
+  end
+
+  def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
+    { :noreply, delete_subscribers(state, subscribers_to_delete) }
   end
 end
