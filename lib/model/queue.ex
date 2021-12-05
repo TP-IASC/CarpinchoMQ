@@ -35,6 +35,41 @@ defmodule Queue do
       def handle_call(:get, _from, state) do
         { :reply, state, state }
       end
+
+      defp add_new_element(state, new_message) do
+        new_element = %{message: new_message, consumers_that_did_not_ack: [], number_of_attempts: 0}
+        Map.put(state, :elements, [new_element|state.elements])
+      end
+
+      defp delete_element(state, element) do
+        Map.put(state, :elements, List.delete(state.elements, element))
+      end
+
+      defp update_specific_element(state, message, update_element) do
+        Map.put(state, :elements, Enum.map(state.elements, fn element ->
+          if element.message == message do update_element.(element) else element end
+        end))
+      end
+
+      defp add_subscriber(state, subscriber) do
+        Map.put(state, :subscribers, [subscriber|state.subscribers])
+      end
+
+      defp remove_subscriber(state, subscriber) do
+        Map.put(state, :subscribers, List.delete(state.subscribers, subscriber))
+      end
+
+      defp update_consumers_that_did_not_ack(element, consumer_pid) do
+        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
+      end
+
+      defp init_sent_element_props(element, subscribers) do
+        element
+          |> Map.put(:consumers_that_did_not_ack, subscribers)
+          |> increase_number_of_attempts
+      end
+
+      defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
     end
   end
 
