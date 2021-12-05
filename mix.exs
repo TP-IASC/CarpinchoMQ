@@ -26,7 +26,8 @@ defmodule CarpinchoMq.MixProject do
       { :horde, git: "https://github.com/TP-IASC/horde.git" },
       { :ok, "~> 2.3" },
       { :plug_cowboy, "~> 2.5.2" },
-      { :poison, "~> 5.0" }
+      { :poison, "~> 5.0" },
+      { :corsica, "~> 1.0"}
     ]
   end
 end

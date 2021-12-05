@@ -1,7 +1,9 @@
 defmodule HTTPServer do
   use Plug.Router
+
   import Plug.Conn
 
+  plug CORS
   plug :match
   plug Plug.Parsers, parsers: [:json],
                      json_decoder: Jason
@@ -47,4 +49,10 @@ defmodule HTTPServer do
 
     send_resp(conn, 200, "Success!")
   end
+
+
+  match _ do
+    send_resp(conn, 404, "URL not found")
+  end
+
 end
