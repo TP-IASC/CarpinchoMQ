@@ -12,7 +12,6 @@ defmodule HTTPServer do
 
 
   get "/queue/:name/state" do
-    conn = fetch_query_params(conn)
 
     atom_name = String.to_atom(name)
     state = Queue.state(atom_name)
@@ -20,17 +19,7 @@ defmodule HTTPServer do
     send_resp(conn, 200, state |> Poison.encode!)
   end
 
-  get "/queue/:name/state/elements" do
-    conn = fetch_query_params(conn)
-
-    atom_name = String.to_atom(name)
-    elements = Queue.state(atom_name) |> Map.get(:elements, "") |> Poison.encode!
-
-    send_resp(conn, 200, elements)
-  end
-
-  get "/queue" do
-    conn = fetch_query_params(conn)
+  get "/queues" do
 
     names = Utils.show_registry |> Enum.map( fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
     names_without_replica = names |> Enum.filter(fn(n) -> !String.contains?(n, "_replica") end) |> Poison.encode!
