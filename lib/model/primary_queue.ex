@@ -58,7 +58,7 @@ defmodule PrimaryQueue do
   def handle_info({:message_attempt_timeout, message}, state) do
     queue_name = state.name
 
-    element = get_element_by_message(state, message)
+    element = get_element_by_message(state, message.id)
     unless element == nil or Enum.empty?(element.consumers_that_did_not_ack) do
       if element.number_of_attempts == 5 do
         warning(state.name, "Discarding message #{inspect(message)} after sending it 5 times. Consumers that didn't answer: #{inspect element.consumers_that_did_not_ack}.")
@@ -125,7 +125,7 @@ defmodule PrimaryQueue do
 
   defp add_receivers_to_state_message(state, subscribers, message) do
     send_to_replica(state.name, { :add_receivers_to_state_message, subscribers, message })
-    update_specific_element(state, message, &(init_element(&1, subscribers)))
+    update_specific_element(state, message.id, &(init_element(&1, subscribers)))
   end
 
   defp send_to_replica(queue_name, request) do
