@@ -8,11 +8,7 @@ defmodule HTTPServer do
   plug :dispatch
 
 
-  @queue "queue_name"
-
-
-  get "/queue/:name/state" do
-
+  get "/queues/:name/state" do
     atom_name = String.to_atom(name)
     state = Queue.state(atom_name)
 
@@ -20,7 +16,6 @@ defmodule HTTPServer do
   end
 
   get "/queues" do
-
     names = Utils.show_registry |> Enum.map( fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
     names_without_replica = names |> Enum.filter(fn(n) -> !String.contains?(n, "_replica") end) |> Poison.encode!
 
@@ -28,12 +23,13 @@ defmodule HTTPServer do
   end
 
 
-  @size "max_size"
-  @mode "work_mode"
 
-  post "/queue" do
+  @queue "name"
+  @size "maxSize"
+  @mode "workMode"
 
-    %{ @queue => name, @size => max_size, @mode => work_mode} = conn.body_params
+  post "/queues" do
+    %{ @queue => name, @size => max_size, @mode => work_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
 
@@ -42,16 +38,13 @@ defmodule HTTPServer do
     send_resp(conn, 200, "Success!")
   end
 
-  @message "message"
+  @payload "payload"
 
-  post "/queue/state/messages" do
-
-    %{ @queue => name, @message => message} = conn.body_params
+  post "/queues/:name/messages" do
+    %{ @payload => payload } = conn.body_params
     atom_name = String.to_atom(name)
-
-    Producer.push_message(atom_name, message)
+    Producer.push_message(atom_name, payload)
 
     send_resp(conn, 200, "Success!")
   end
-
 end
