@@ -17,12 +17,14 @@ defmodule HTTPServer do
 
 
   get "/queues/:name/state" do
+    endpoint_info("GET", "/queues/#{name}/state")
     atom_name = String.to_atom(name)
     maybe_state = Queue.state(atom_name)
     handle_response(conn, maybe_state)
   end
 
   get "/queues" do
+    endpoint_info("GET", "/queues")
     names = Utils.show_registry |> Enum.map(fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
     names_without_replica = names |> Enum.filter(fn(n) -> !String.contains?(n, "_replica") end)
     handle_response(conn, OK.success(names_without_replica))
@@ -34,6 +36,7 @@ defmodule HTTPServer do
   @mode "workMode"
 
   post "/queues" do
+    endpoint_info("POST", "/queues", conn.body_params)
     %{ @queue => name, @size => max_size, @mode => work_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
@@ -44,12 +47,12 @@ defmodule HTTPServer do
   @payload "payload"
 
   post "/queues/:name/messages" do
+    endpoint_info("POST", "/queues/#{name}/messages", conn.body_params)
     %{ @payload => payload } = conn.body_params
     atom_name = String.to_atom(name)
 
     handle_post_response(conn, Producer.push_message(atom_name, payload))
   end
-
 
   match _ do
     respond(conn, 404, "resource not found")
@@ -67,8 +70,7 @@ defmodule HTTPServer do
     after
       respond(conn, 200, json)
     rescue
-      { _type, description } -> respond(conn, 404, description)
-      _ -> respond(conn, 404, "resource not found")
+      error_reason -> Errors.json(error_reason)
     end
   end
 
@@ -78,18 +80,18 @@ defmodule HTTPServer do
     |> send_resp(code, data)
   end
 
-  defp log_message(method, endpoint, message, logging_function),
-    do: "[HTTP] [#{method}] [#{endpoint}] #{message}" |> logging_function.()
+  defp endpoint_log(method, endpoint, body, logging_function),
+    do: "[HTTP] #{method} #{endpoint} #{inspect(body)}" |> logging_function.()
 
-  defp debug(method, endpoint, message) do
-    log_message(method, endpoint, message, &Logger.debug/1)
-  end
+  defp endpoint_info(method, endpoint, body \\ %{}),
+    do: endpoint_log(method, endpoint, body, &Logger.info/1)
 
-  defp info(method, endpoint, message) do
-    log_message(method, endpoint, message, &Logger.info/1)
-  end
+#  defp log_message(message, logging_function),
+#    do: "[HTTP] #{message}" |> logging_function.()
+#
+#  defp info(message),
+#    do: log_message(message, &Logger.info/1)
 
-  defp warning(method, endpoint, message) do
-    log_message(method, endpoint, message, &Logger.warning/1)
-  end
+#  defp debug(message),
+#    do: log_message(message, &Logger.debug/1)
 end

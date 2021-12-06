@@ -13,7 +13,7 @@ defmodule App do
       App.HordeRegistry,
       { App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] },
       App.NodeObserver.Supervisor,
-      {HTTPServerSupervisor, http_port},
+      { HTTPServerSupervisor, http_port },
       { UDPServerSupervisor, udp_port }
     ]
 
