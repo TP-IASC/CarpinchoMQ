@@ -116,7 +116,7 @@ A continuacion te pasamos los comandos:
   iex --sname <nombre_nodo> -S mix 
    ``` 
  ```sh
-  iex --sname "a" -S mix 
+  iex --sname a -S mix 
    ``` 
 * Crear una cola nueva: 
 ```sh
