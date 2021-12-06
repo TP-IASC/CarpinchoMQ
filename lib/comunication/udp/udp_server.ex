@@ -19,44 +19,42 @@ defmodule UDPServer do
     }
 
     debug("sending #{inspect(message)} from #{queue_name} to #{inspect(consumer)}")
-
-    :gen_udp.send(socket, consumer.address, consumer.port, Jason.encode!(message))
+    { :ok, address } = consumer.address |> to_charlist |> :inet.parse_address()
+    :gen_udp.send(socket, address, consumer.port, Jason.encode!(message))
     { :noreply, socket }
   end
 
   def handle_info({:udp, _socket, address, _port, data}, socket) do
     case Jason.decode(data) do
       { :ok, %{ "port" => listeningPort, "data" => %{ "method" => method, "body" => body } } } ->
-        handle_packet(method, body, address, listeningPort)
+        consumer = new_consumer(address, listeningPort)
+        handle_packet(method, body, consumer)
       _ -> handle_parse_error(data)
     end
 
     { :noreply, socket }
   end
 
-  defp handle_packet("subscribe", %{ "queueName" => queue_name }, address, listeningPort) do
-    consumer = %{ address: address, port: listeningPort }
+  defp handle_packet("subscribe", %{ "queueName" => queue_name }, consumer) do
     info("subscription message from #{inspect(consumer)} to #{queue_name}")
     Consumer.subscribe(String.to_atom(queue_name), consumer)
   end
 
-  defp handle_packet("unsubscribe", %{ "queueName" => queue_name }, address, listeningPort) do
-    consumer = %{ address: address, port: listeningPort }
+  defp handle_packet("unsubscribe", %{ "queueName" => queue_name }, consumer) do
     info("unsubscription message from from #{inspect(consumer)} to #{queue_name}")
-    Consumer.unsubscribe(String.to_atom(queue_name), %{ address: address, port: listeningPort })
+    Consumer.unsubscribe(String.to_atom(queue_name), consumer)
   end
 
-  defp handle_packet("ack", %{ "queueName" => queue_name, "messageId" => message_id }, address, listeningPort) do
-    consumer = %{ address: address, port: listeningPort }
+  defp handle_packet("ack", %{ "queueName" => queue_name, "messageId" => message_id }, consumer) do
     info("received ack message from #{inspect(consumer)} to #{queue_name}")
-    Consumer.ack(String.to_atom(queue_name), String.to_atom(message_id), %{ address: address, port: listeningPort })
+    Consumer.ack(String.to_atom(queue_name), String.to_atom(message_id), consumer)
   end
 
-  defp handle_packet(method, body, address, listeningPort) do
+  defp handle_packet(method, body, consumer) do
     message = %{
       "method" => method,
       "body" => body,
-      "from" => inspect(address) <> ":" <> inspect(listeningPort)
+      "from" => inspect(consumer)
     }
 
     debug("could not resolve method: #{inspect(message)}")
@@ -75,5 +73,12 @@ defmodule UDPServer do
 
   defp info(message) do
     log_message(message) |> Logger.info
+  end
+
+  defp new_consumer(address, port) do
+    %{
+      address: address |> :inet_parse.ntoa |> to_string(),
+      port: port
+    }
   end
 end

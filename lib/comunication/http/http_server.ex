@@ -4,6 +4,7 @@ defmodule HTTPServer do
   import Plug.Conn
 
   require OK
+  require Logger
 
   plug Corsica,
     origins: "*",
@@ -72,6 +73,7 @@ defmodule HTTPServer do
   end
 
   def respond(conn, code, data) do
+    if code == 404, do: Logger.error(data)
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(code, data)
