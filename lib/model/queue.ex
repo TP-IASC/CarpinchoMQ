@@ -83,9 +83,18 @@ defmodule Queue do
     |> GenServer.cast(request)
   end
 
-  def call(queue_name, request) do
+  def call!(queue_name, request) do
     via_tuple(queue_name)
     |> GenServer.call(request)
+  end
+
+  def call(queue_name, request) do
+    OK.for do
+      _ <- check_alive(queue_name)
+      result <- via_tuple(queue_name) |> GenServer.call(request) |> OK.wrap
+    after
+      result
+    end
   end
 
   def all do
@@ -117,13 +126,13 @@ defmodule Queue do
   end
 
   defp check_name(queue_name),
-    do: OK.check({:ok, queue_name}, &(Queue.valid_name?(&1)), {:name_not_allowed, "Queue name #{inspect(queue_name)} is not allowed"})
+    do: OK.check({:ok, queue_name}, &(Queue.valid_name?(&1)), {:name_not_allowed, "queue name #{inspect(queue_name)} is not allowed"})
 
   defp check_not_alive(queue_name),
-    do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), {:queue_already_exists, "A queue named #{inspect(queue_name)} already exists"})
+    do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), {:queue_already_exists, "a queue named #{inspect(queue_name)} already exists"})
 
-  defp check_alive(queue_name),
-    do: OK.check({:ok, queue_name}, &(Queue.alive?(&1)), {:queue_not_found, "A queue named #{inspect(queue_name)} does not exist"})
+  def check_alive(queue_name),
+    do: OK.check({:ok, queue_name}, &(Queue.alive?(&1)), {:queue_not_found, "a queue named #{inspect(queue_name)} does not exist"})
 
   defp complete_check(queue_name, check) do
     OK.for do

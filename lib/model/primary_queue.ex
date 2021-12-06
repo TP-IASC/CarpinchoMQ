@@ -10,7 +10,13 @@ defmodule PrimaryQueue do
 
   def handle_continue(:check_replica, default_state) do
     replica = Queue.replica_name(default_state.name)
-    state = if Queue.alive?(replica), do: Queue.state(replica) |> Map.put(:name, default_state.name), else: default_state
+    state = OK.try do
+      replica_state <- Queue.state(replica)
+    after
+      replica_state |> Map.put(:name, default_state.name)
+    rescue
+      _ -> default_state
+    end
     { :noreply, state }
   end
 
