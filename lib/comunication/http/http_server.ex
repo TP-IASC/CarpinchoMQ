@@ -55,7 +55,7 @@ defmodule HTTPServer do
   end
 
   def handle_post_response(conn, response) do
-    maybe_result =  response |> OK.flat_map(fn _ -> "success!" end)
+    maybe_result =  response |> OK.flat_map(fn _ -> OK.success("success!") end)
     handle_response(conn, maybe_result)
   end
 
