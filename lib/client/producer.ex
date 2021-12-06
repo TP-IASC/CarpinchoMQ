@@ -8,6 +8,10 @@ defmodule Producer do
     end
   end
 
+  def delete_queue(queue_name) do
+    Queue.delete(queue_name)
+  end
+
   def push_message(queue_name, message) do
     Queue.call(queue_name, {:push, message})
   end

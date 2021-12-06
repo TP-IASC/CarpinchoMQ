@@ -70,7 +70,7 @@ defmodule Queue do
         Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
       end
 
-      defp init_element(element, subscribers) do
+      defp init_sent_element_props(element, subscribers) do
         element
         |> Map.put(:consumers_that_did_not_ack, subscribers)
         |> increase_number_of_attempts
@@ -102,14 +102,18 @@ defmodule Queue do
     %{id: id, timestamp: now, payload: payload}
   end
 
+  defp replica_sufix, do: "_replica"
+
   def replica_name(queue_name) when is_atom(queue_name),
-      do: Atom.to_string(queue_name) <> "_replica"
-          |> String.to_atom
+    do: Atom.to_string(queue_name) <> replica_sufix() |> String.to_atom
 
   def primary_name(replica_name) when is_atom(replica_name),
-      do: Atom.to_string(replica_name)
-          |> String.slice(0..-String.length("_replica") - 1)
-          |> String.to_atom
+    do: Atom.to_string(replica_name)
+        |> String.slice(0..-String.length(replica_sufix())-1)
+        |> String.to_atom
+
+  def valid_name?(queue_name),
+    do: not String.ends_with?(Atom.to_string(queue_name), replica_sufix())
 
   def alive?(name), do: whereis(name) != nil
 
@@ -129,25 +133,40 @@ defmodule Queue do
 
   def new(queue_name, max_size, work_mode) do
     OK.for do
-      primary_name <- check_queue(queue_name)
-      replica_name <- check_queue(Queue.replica_name(queue_name))
-      primary_pid <- Horde.DynamicSupervisor.start_child(
-        App.HordeSupervisor,
-        {PrimaryQueue, [primary_name, max_size, work_mode]}
-      )
-      replica_pid <- Horde.DynamicSupervisor.start_child(
-        App.HordeSupervisor,
-        {ReplicaQueue, [replica_name, max_size, work_mode]}
-      )
+      _ <- check_name(queue_name)
+      { primary_name, replica_name } <- complete_check(queue_name, &check_not_alive/1)
+      primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size, work_mode]})
+      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode]})
     after
       {primary_pid, replica_pid}
     end
   end
 
-  defp check_queue(queue_name),
-       do: OK.check(
-         {:ok, queue_name},
-         &(!Queue.alive?(&1)),
-         {:queue_already_exists, "A queue named #{inspect(queue_name)} already exists"}
-       )
+  def delete(queue_name) do
+    OK.for do
+      { primary_name, replica_name } <- complete_check(queue_name, &check_alive/1)
+      Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(primary_name))
+      Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(replica_name))
+    after
+      :deleted
+    end
+  end
+
+  defp check_name(queue_name),
+    do: OK.check({:ok, queue_name}, &(Queue.valid_name?(&1)), {:name_not_allowed, "Queue name #{inspect(queue_name)} is not allowed"})
+
+  defp check_not_alive(queue_name),
+    do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), {:queue_already_exists, "A queue named #{inspect(queue_name)} already exists"})
+
+  defp check_alive(queue_name),
+    do: OK.check({:ok, queue_name}, &(Queue.alive?(&1)), {:queue_not_found, "A queue named #{inspect(queue_name)} does not exist"})
+
+  defp complete_check(queue_name, check) do
+    OK.for do
+      a <- check.(queue_name)
+      b <- check.(replica_name(queue_name))
+    after
+      { a, b }
+    end
+  end
 end
