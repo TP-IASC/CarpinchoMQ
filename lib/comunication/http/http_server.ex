@@ -23,7 +23,7 @@ defmodule HTTPServer do
   end
 
   get "/queues" do
-    names = Utils.show_registry |> Enum.map( fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
+    names = Utils.show_registry |> Enum.map(fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
     names_without_replica = names |> Enum.filter(fn(n) -> !String.contains?(n, "_replica") end)
     handle_response(conn, OK.success(names_without_replica))
   end
@@ -73,9 +73,23 @@ defmodule HTTPServer do
   end
 
   def respond(conn, code, data) do
-    if code == 404, do: Logger.error(data)
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(code, data)
+  end
+
+  defp log_message(method, endpoint, message, logging_function),
+    do: "[HTTP] [#{method}] [#{endpoint}] #{message}" |> logging_function.()
+
+  defp debug(method, endpoint, message) do
+    log_message(method, endpoint, message, &Logger.debug/1)
+  end
+
+  defp info(method, endpoint, message) do
+    log_message(method, endpoint, message, &Logger.info/1)
+  end
+
+  defp warning(method, endpoint, message) do
+    log_message(method, endpoint, message, &Logger.warning/1)
   end
 end

@@ -51,28 +51,26 @@ defmodule UDPServer do
   end
 
   defp handle_packet(method, body, consumer) do
-    message = %{
-      "method" => method,
-      "body" => body,
-      "from" => inspect(consumer)
-    }
+    debug("[#{String.upcase(method)}] could not resolve method for body: #{inspect(body)} (#{consumer_string(consumer)})")
+  end
 
-    debug("could not resolve method: #{inspect(message)}")
+  defp consumer_string(consumer) do
+    "#{consumer.address}:#{consumer.port}"
   end
 
   defp handle_parse_error(data) do
     debug("could not parse message: #{inspect(data)}")
   end
 
-  defp log_message(message),
-    do: "[UDP] #{message}"
+  defp log_message(message, logging_function),
+    do: "[UDP] #{message}" |> logging_function.()
 
   defp debug(message) do
-    log_message(message) |> Logger.debug
+    log_message(message, &Logger.debug/1)
   end
 
   defp info(message) do
-    log_message(message) |> Logger.info
+    log_message(message, &Logger.info/1)
   end
 
   defp new_consumer(address, port) do

@@ -25,7 +25,7 @@ defmodule PrimaryQueue do
   def handle_call({:push, payload}, _from, state) do
     size = Enum.count(state.elements)
     if size >= state.max_size do
-      { :reply, OK.failure({:max_size_exceded, "queue max size (#{state.max_size}) cannot be exceded"}), state }
+      { :reply, OK.failure(Errors.queue_max_size_exeded(state.max_size)), state }
     else
       new_message = create_message(payload)
 
