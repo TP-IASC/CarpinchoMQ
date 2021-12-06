@@ -72,8 +72,10 @@ defmodule Queue do
       defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
 
       defp delete_subscribers(state, subscribers_to_delete) do
-        new_state = remove_subscribers(state, subscribers_to_delete)
-        delete_subscribers_from_all_elements(new_state, subscribers_to_delete)
+        state
+          |> remove_subscribers(subscribers_to_delete)
+          |> delete_subscribers_from_all_elements(subscribers_to_delete)
+          |> delete_elements_that_dont_require_acks_anymore
       end
 
       defp delete_subscribers_from_all_elements(state, subscribers_to_delete) do
@@ -81,6 +83,12 @@ defmodule Queue do
           update_consumers_that_did_not_ack(element, subscribers_to_delete)
         end))
       end
+
+      defp delete_elements_that_dont_require_acks_anymore(state) do
+        Map.put(state, :elements, Enum.reject(state.elements, fn element -> got_all_acks?(element) end))
+      end
+
+      defp got_all_acks?(element), do: Enum.empty?(element.consumers_that_did_not_ack)
     end
   end
 

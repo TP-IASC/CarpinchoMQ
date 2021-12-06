@@ -53,12 +53,11 @@ defmodule PrimaryQueue do
     queue_name = state.name
 
     element = get_element_by_message(state, message)
-    unless element == nil or Enum.empty?(element.consumers_that_did_not_ack) do
+    unless element == nil or got_all_acks?(element) do
       if element.number_of_attempts == 5 do
-        Logger.error "Discarding message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{inspect element.consumers_that_did_not_ack}"
+        Logger.error "Discarding message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{inspect element.consumers_that_did_not_ack} will be unsubscribed"
         Queue.cast(state.name, {:delete, element})
         Queue.cast(state.name, {:delete_dead_subscribers, element.consumers_that_did_not_ack})
-        # falta eliminar a los mensajes que hayan quedado sin subscribers
         {:noreply, state}
       else
         new_state = update_specific_element(state, message, &(increase_number_of_attempts(&1)))
@@ -78,7 +77,7 @@ defmodule PrimaryQueue do
     element = get_element_by_message(new_state, message)
     unless element == nil do
       Logger.info "Got an ACK of message #{message.payload}, from consumer: #{inspect consumer_pid}"
-      if Enum.empty?(element.consumers_that_did_not_ack) do
+      if got_all_acks?(element) do
         Logger.info "Got all ACKs of message #{message.payload}"
         Queue.cast(state.name, {:delete, element})
       end
@@ -91,13 +90,11 @@ defmodule PrimaryQueue do
 
   def handle_cast({:delete, element}, state) do
     send_to_replica(state.name, {:delete, element})
-
     { :noreply, delete_element(state, element) }
   end
 
   def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
     send_to_replica(state.name, {:delete_dead_subscribers, subscribers_to_delete})
-
     { :noreply, delete_subscribers(state, subscribers_to_delete) }
   end
 
