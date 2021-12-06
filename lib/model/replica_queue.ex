@@ -35,7 +35,8 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:update_next_subscriber_to_send, next_subscriber_to_send}, state) do
-    { :noreply, update_next_subscriber(state, next_subscriber_to_send) }
+    new_state = update_next_subscriber(state, next_subscriber_to_send)
+    { :noreply, new_state }
   end
 
   def handle_cast({:send_ack, message, consumer_pid}, state) do

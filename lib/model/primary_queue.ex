@@ -126,7 +126,7 @@ defmodule PrimaryQueue do
     if length(all_subscribers) == state.next_subscriber_to_send  do
       subscriber_to_send = Enum.at(all_subscribers, 0)
       send_message_to(message, [subscriber_to_send], queue_name)
-      new_state = update_next_subscriber(state, 1)
+      new_state = update_next_subscribers_and_replica(state, 1)
                   |> add_receivers_to_state_message([subscriber_to_send], message)
       {
         :noreply,
@@ -135,7 +135,7 @@ defmodule PrimaryQueue do
     else
       subscriber_to_send = Enum.at(all_subscribers, state.next_subscriber_to_send)
       send_message_to(message, [subscriber_to_send], queue_name)
-      new_state = update_next_subscriber(state, state.next_subscriber_to_send + 1)
+      new_state = update_next_subscribers_and_replica(state, state.next_subscriber_to_send + 1)
                   |> add_receivers_to_state_message([subscriber_to_send], message)
       {
         :noreply,

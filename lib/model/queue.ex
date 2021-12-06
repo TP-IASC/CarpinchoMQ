@@ -59,7 +59,7 @@ defmodule Queue do
       end
 
       defp add_subscriber(state, subscriber) do
-        Map.put(state, :subscribers, [state.subscribers | subscriber ])
+        Map.put(state, :subscribers, state.subscribers ++ [subscriber] )
       end
 
       defp remove_subscriber(state, subscriber) do
