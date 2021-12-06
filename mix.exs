@@ -27,7 +27,8 @@ defmodule CarpinchoMq.MixProject do
       { :ok, "~> 2.3" },
       { :plug_cowboy, "~> 2.5.2" },
       { :poison, "~> 5.0" },
-      { :corsica, "~> 1.0"}
+      { :corsica, "~> 1.0"},
+      { :jason, "~> 1.2" }
     ]
   end
 end

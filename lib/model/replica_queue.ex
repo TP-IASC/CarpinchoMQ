@@ -3,7 +3,7 @@ defmodule ReplicaQueue do
   require Logger
 
   def init(default_state) do
-    Logger.info "Queue: #{default_state.name} started"
+    info(default_state.name, "queue started")
     Process.flag(:trap_exit, true)
     { :ok, default_state }
   end
@@ -13,46 +13,40 @@ defmodule ReplicaQueue do
     state = OK.try do
       primary_state <- Queue.state(primary)
     after
+      debug(default_state.name, "restored from primary queue")
       primary_state |> Map.put(:name, default_state.name)
     rescue
       _ -> default_state
     end
+
     { :noreply, state }
   end
 
   def handle_cast({:push, message}, state) do
-    { :noreply, Map.put(state, :elements, [%{message: message, consumers_that_did_not_ack: []}|state.elements]) }
+    { :noreply, add_new_element(state, message) }
   end
 
   def handle_cast({:delete, element}, state) do
-    { :noreply, Map.put(state, :elements, List.delete(state.elements, element)) }
+    { :noreply, delete_element(state, element) }
   end
 
-  def handle_cast({:subscribe, pid}, state) do
-    { :noreply, Map.put(state, :subscribers, [pid|state.subscribers]) }
+  def handle_cast({:subscribe, consumer}, state) do
+    { :noreply, add_subscriber(state, consumer) }
   end
 
-  def handle_cast({:unsubscribe, pid}, state) do
-    { :noreply, Map.put(state, :subscribers, List.delete(state.subscribers, pid)) }
+  def handle_cast({:unsubscribe, consumer}, state) do
+    { :noreply, remove_subscriber(state, consumer) }
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
-    { :noreply, Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, subscribers)
-      else
-        element
-      end
-    end)) }
+    { :noreply, update_specific_element(state, message, &(init_element(&1, subscribers))) }
   end
 
-  def handle_cast({:send_ack, message, consumer_pid}, state) do
-    { :noreply, Map.put(state, :elements, Enum.map(state.elements, fn element ->
-      if element.message == message do
-        Map.put(element, :consumers_that_did_not_ack, List.delete(element.consumers_that_did_not_ack, consumer_pid))
-      else
-        element
-      end
-    end)) }
+  def handle_cast({:ack, message_id, consumer}, state) do
+    { :noreply, update_specific_element(state, message_id, &(update_consumers_that_did_not_ack(&1, consumer))) }
+  end
+
+  def handle_cast({:message_attempt_timeout, message}, state) do
+    { :noreply, update_specific_element(state, message.id, &(increase_number_of_attempts(&1))) }
   end
 end
