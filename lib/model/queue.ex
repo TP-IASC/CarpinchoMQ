@@ -13,13 +13,14 @@ defmodule Queue do
         :name,
         :max_size,
         :work_mode,
+        :queue_mode,
         elements: [],
         subscribers: [],
         next_subscriber_to_send: 0
       ]
 
-      def start_link([name, max_size, work_mode]) when is_atom(name) do
-        default_state = %__MODULE__{name: name, max_size: max_size, work_mode: work_mode}
+      def start_link([name, max_size, work_mode, queue_mode]) when is_atom(name) do
+        default_state = %__MODULE__{name: name, max_size: max_size, work_mode: work_mode, queue_mode: queue_mode}
         GenServer.start_link(__MODULE__, default_state, name: via_tuple(name))
       end
 
@@ -72,17 +73,18 @@ defmodule Queue do
 
       defp init_sent_element_props(element, subscribers) do
         element
-          |> Map.put(:consumers_that_did_not_ack, subscribers)
-          |> increase_number_of_attempts
+        |> Map.put(:consumers_that_did_not_ack, subscribers)
+        |> increase_number_of_attempts
       end
 
-      defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
+      defp increase_number_of_attempts(element),
+           do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
 
       defp delete_subscribers(state, subscribers_to_delete) do
         state
-          |> remove_subscribers(subscribers_to_delete)
-          |> delete_subscribers_from_all_elements(subscribers_to_delete)
-          |> delete_elements_that_dont_require_acks_anymore
+        |> remove_subscribers(subscribers_to_delete)
+        |> delete_subscribers_from_all_elements(subscribers_to_delete)
+        |> delete_elements_that_dont_require_acks_anymore
       end
 
       defp delete_subscribers_from_all_elements(state, subscribers_to_delete) do
@@ -105,8 +107,8 @@ defmodule Queue do
 
   def merge_queues(queue1, queue2) do
     Enum.concat(queue1, queue2)
-      |> Enum.sort_by(fn msg -> msg.timestamp end, &DateTime.compare(&1, &2) != :lt)
-      |> Enum.dedup
+    |> Enum.sort_by(fn msg -> msg.timestamp end, &DateTime.compare(&1, &2) != :lt)
+    |> Enum.dedup
   end
 
   def create_message(payload) do
@@ -120,12 +122,14 @@ defmodule Queue do
 
   defp replica_sufix, do: "_replica"
 
-  def replica_name(queue_name) when is_atom(queue_name), do: Atom.to_string(queue_name) <> replica_sufix() |> String.to_atom
+  def replica_name(queue_name) when is_atom(queue_name),
+      do: Atom.to_string(queue_name) <> replica_sufix()
+          |> String.to_atom
 
   def primary_name(replica_name) when is_atom(replica_name),
-    do: Atom.to_string(replica_name)
-        |> String.slice(0..-String.length(replica_sufix())-1)
-        |> String.to_atom
+      do: Atom.to_string(replica_name)
+          |> String.slice(0..-String.length(replica_sufix()) - 1)
+          |> String.to_atom
 
   def valid_name?(queue_name), do: not String.ends_with?(Atom.to_string(queue_name), replica_sufix())
 
@@ -137,20 +141,20 @@ defmodule Queue do
 
   def cast(queue_name, request) do
     via_tuple(queue_name)
-      |> GenServer.cast(request)
+    |> GenServer.cast(request)
   end
 
   def call(queue_name, request) do
     via_tuple(queue_name)
-      |> GenServer.call(request)
+    |> GenServer.call(request)
   end
 
-  def new(queue_name, max_size, work_mode) do
+  def new(queue_name, max_size, work_mode, queue_mode) do
     OK.for do
       _ <- check_name(queue_name)
       { primary_name, replica_name } <- complete_check(queue_name, &check_not_alive/1)
-      primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size, work_mode]})
-      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode]})
+      primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size, work_mode, queue_mode]})
+      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode, queue_mode]})
     after
       {primary_pid, replica_pid}
     end
@@ -158,7 +162,7 @@ defmodule Queue do
 
   def delete(queue_name) do
     OK.for do
-      { primary_name, replica_name } <- complete_check(queue_name, &check_alive/1)
+      {primary_name, replica_name} <- complete_check(queue_name, &check_alive/1)
       Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(primary_name))
       Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(replica_name))
     after
@@ -180,7 +184,7 @@ defmodule Queue do
       a <- check.(queue_name)
       b <- check.(replica_name(queue_name))
     after
-      { a, b }
+      {a, b}
     end
   end
 end

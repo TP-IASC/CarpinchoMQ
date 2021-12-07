@@ -1,10 +1,20 @@
 defmodule Producer do
   require OK
-  def new_queue(queue_name, max_size, work_mode) do
-    unless Enum.member?([:publish_subscribe, :work_queue], work_mode) do
-      OK.failure({:non_existent_work_mode, "Work mode \"#{work_mode}\" does not exist. Available work modes: :publish_subscribe and :work_queue"})
+  require Logger
+  def new_queue(queue_name, max_size, work_mode, queue_mode) do
+    Logger.info("Creating queue: #{queue_mode}")
+    unless Enum.member?([:publish_subscribe, :work_queue], work_mode) and Enum.member?([:non_transactional, :transactional], queue_mode) do
+      OK.failure(
+        {
+          :non_existent_work_mode,
+          "Work mode \"#{work_mode}/\" or Queue mode \"#{
+            queue_mode
+          }/\" does not exist. Available work modes: :publish_subscribe and :work_queue. Available queue modes: :transactional and :non_transactional"
+        }
+      )
     else
-      Queue.new(queue_name, max_size, work_mode)
+      Logger.info("Entre")
+      Queue.new(queue_name, max_size, work_mode, queue_mode)
     end
   end
 
