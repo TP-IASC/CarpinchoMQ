@@ -59,7 +59,7 @@ defmodule Queue do
       end
 
       defp add_subscriber(state, subscriber) do
-        Map.put(state, :subscribers, state.subscribers ++ [subscriber] )
+        Map.put(state, :subscribers, state.subscribers ++ [subscriber])
       end
 
       defp remove_subscribers(state, subscribers) do
@@ -72,8 +72,8 @@ defmodule Queue do
 
       defp init_sent_element_props(element, subscribers) do
         element
-        |> Map.put(:consumers_that_did_not_ack, subscribers)
-        |> increase_number_of_attempts
+          |> Map.put(:consumers_that_did_not_ack, subscribers)
+          |> increase_number_of_attempts
       end
 
       defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
@@ -99,16 +99,14 @@ defmodule Queue do
     end
   end
 
-  def via_tuple(queue_name),
-      do: {:via, Horde.Registry, {App.HordeRegistry, queue_name}}
+  def via_tuple(queue_name), do: {:via, Horde.Registry, {App.HordeRegistry, queue_name}}
 
-  def whereis(queue_name),
-      do: GenServer.whereis(via_tuple(queue_name))
+  def whereis(queue_name), do: GenServer.whereis(via_tuple(queue_name))
 
   def merge_queues(queue1, queue2) do
     Enum.concat(queue1, queue2)
-    |> Enum.sort_by(fn msg -> msg.timestamp end, &DateTime.compare(&1, &2) != :lt)
-    |> Enum.dedup
+      |> Enum.sort_by(fn msg -> msg.timestamp end, &DateTime.compare(&1, &2) != :lt)
+      |> Enum.dedup
   end
 
   def create_message(payload) do
@@ -122,16 +120,14 @@ defmodule Queue do
 
   defp replica_sufix, do: "_replica"
 
-  def replica_name(queue_name) when is_atom(queue_name),
-    do: Atom.to_string(queue_name) <> replica_sufix() |> String.to_atom
+  def replica_name(queue_name) when is_atom(queue_name), do: Atom.to_string(queue_name) <> replica_sufix() |> String.to_atom
 
   def primary_name(replica_name) when is_atom(replica_name),
     do: Atom.to_string(replica_name)
         |> String.slice(0..-String.length(replica_sufix())-1)
         |> String.to_atom
 
-  def valid_name?(queue_name),
-    do: not String.ends_with?(Atom.to_string(queue_name), replica_sufix())
+  def valid_name?(queue_name), do: not String.ends_with?(Atom.to_string(queue_name), replica_sufix())
 
   def alive?(name), do: whereis(name) != nil
 
@@ -141,12 +137,12 @@ defmodule Queue do
 
   def cast(queue_name, request) do
     via_tuple(queue_name)
-    |> GenServer.cast(request)
+      |> GenServer.cast(request)
   end
 
   def call(queue_name, request) do
     via_tuple(queue_name)
-    |> GenServer.call(request)
+      |> GenServer.call(request)
   end
 
   def new(queue_name, max_size, work_mode) do
