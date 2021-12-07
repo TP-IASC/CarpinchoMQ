@@ -1,4 +1,4 @@
-FROM bitwalker/alpine-elixir
+FROM bitwalker/alpine-elixir:latest
 
 RUN mkdir /app
 WORKDIR /app
