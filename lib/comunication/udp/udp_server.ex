@@ -27,8 +27,13 @@ defmodule UDPServer do
   def handle_info({:udp, _socket, address, _port, data}, socket) do
     case Jason.decode(data) do
       { :ok, %{ "port" => listeningPort, "data" => %{ "method" => method, "body" => body } } } ->
-        consumer = new_consumer(address, listeningPort)
-        handle_packet(method, body, consumer)
+        if valid_port?(listeningPort) do
+         consumer = new_consumer(address, listeningPort)
+         handle_packet(method, body, consumer)
+        else
+          warning("received invalid listening port in #{inspect(data)}")
+        end
+
       _ -> handle_parse_error(data)
     end
 
@@ -73,10 +78,16 @@ defmodule UDPServer do
     log_message(message, &Logger.info/1)
   end
 
+  defp warning(message) do
+    log_message(message, &Logger.warning/1)
+  end
+
   defp new_consumer(address, port) do
     %{
       address: address |> :inet_parse.ntoa |> to_string(),
       port: port
     }
   end
+
+  defp valid_port?(port), do: is_integer(port)
 end
