@@ -10,11 +10,13 @@ defmodule PrimaryQueue do
 
   def handle_continue(:check_replica, default_state) do
     replica = Queue.replica_name(default_state.name)
-    state = if Queue.alive?(replica) do
+    state = OK.try do
+      replica_state <- Queue.state(replica)
+    after
       debug(default_state.name, "restored from replica")
-      Queue.state(replica) |> Map.put(:name, default_state.name)
-    else
-      default_state
+      replica_state |> Map.put(:name, default_state.name)
+    rescue
+      _ -> default_state
     end
 
     { :noreply, state }
@@ -23,7 +25,7 @@ defmodule PrimaryQueue do
   def handle_call({:push, payload}, _from, state) do
     size = Enum.count(state.elements)
     if size >= state.max_size do
-      { :reply, OK.failure({:max_size_exceded, "queue max size (#{state.max_size}) cannot be exceded"}), state }
+      { :reply, OK.failure(Errors.queue_max_size_exeded(state.max_size)), state }
     else
       new_message = create_message(payload)
 

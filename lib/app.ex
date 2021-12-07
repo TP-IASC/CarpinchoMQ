@@ -3,8 +3,8 @@ defmodule App do
   require Logger
 
   def start(_type, _args) do
-    udp_port = Enum.fetch!(System.argv, 0) |> String.to_integer
-    Logger.info(inspect(udp_port))
+    http_port = Enum.fetch!(System.argv, 0) |> String.to_integer
+    udp_port = Enum.fetch!(System.argv, 1) |> String.to_integer
 
     topologies = Application.get_env(:libcluster, :topologies)
 
@@ -13,6 +13,7 @@ defmodule App do
       App.HordeRegistry,
       { App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] },
       App.NodeObserver.Supervisor,
+      { HTTPServerSupervisor, http_port },
       { UDPServerSupervisor, udp_port }
     ]
 
