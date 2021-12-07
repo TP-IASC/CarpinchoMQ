@@ -121,7 +121,7 @@ defmodule PrimaryQueue do
     queue_name = state.name
     all_subscribers = state.subscribers
     if Enum.empty?(all_subscribers) do
-      Logger.warning "The queue #{queue_name} has no subscribers to send the message #{message.payload}"
+      warning(queue_name, "no subscribers to send the message to")
       {:noreply, state}
     end
     if length(all_subscribers) == state.next_subscriber_to_send  do
