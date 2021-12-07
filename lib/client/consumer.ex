@@ -12,7 +12,7 @@ defmodule Consumer do
 
   def handle_cast({:send_message, message, consumer_pid, queue_name}, state) do
     Logger.info "The consumer #{inspect consumer_pid} received the message: #{message.payload} from queue #{queue_name}"
-    # :timer.sleep(:timer.seconds(5)) # Este sleep esta bueno para que el consumer tarde un tiempo en responder el ack, y poder ver el estado de la cola en el medio
+#     :timer.sleep(:timer.seconds(60)) # Este sleep esta bueno para que el consumer tarde un tiempo en responder el ack, y poder ver el estado de la cola en el medio
     Queue.cast(queue_name, {:send_ack, message, consumer_pid})
     { :noreply, state }
   end
