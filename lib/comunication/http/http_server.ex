@@ -1,5 +1,6 @@
 defmodule HTTPServer do
   use Plug.Router
+  use Plug.ErrorHandler
 
   import Plug.Conn
 
@@ -54,8 +55,12 @@ defmodule HTTPServer do
     handle_post_response(conn, Producer.push_message(atom_name, payload))
   end
 
-  match _ do
-    respond(conn, 404, "resource not found")
+
+  @impl Plug.ErrorHandler
+  def handle_errors(conn, %{kind: _kind, reason: reason, stack: stack}) do
+    endpoint_warning(conn.method, conn.request_path, conn.body_params)
+    warning("Unexpected error #{inspect({reason, stack})}")
+    respond(conn, conn.status, "Unexpected error")
   end
 
   def handle_post_response(conn, response) do
@@ -64,14 +69,17 @@ defmodule HTTPServer do
   end
 
   def handle_response(conn, maybe_data) do
-    OK.try do
+    { code, data } = OK.try do
       data <- maybe_data
       json <- Poison.encode(data)
     after
-      respond(conn, 200, json)
+      { 200, json }
     rescue
-      error_reason -> Errors.json(error_reason)
+      { type, code, description } -> { code, Jason.encode!(%{"type" => type, "description" => description}) }
+      _ -> { 500, "Unexpected error" }
     end
+
+    respond(conn, code, data)
   end
 
   def respond(conn, code, data) do
@@ -86,12 +94,18 @@ defmodule HTTPServer do
   defp endpoint_info(method, endpoint, body \\ %{}),
     do: endpoint_log(method, endpoint, body, &Logger.info/1)
 
-#  defp log_message(message, logging_function),
-#    do: "[HTTP] #{message}" |> logging_function.()
+  defp endpoint_warning(method, endpoint, body),
+    do: endpoint_log(method, endpoint, body, &Logger.warning/1)
+
+  defp log_message(message, logging_function),
+    do: "[HTTP] #{message}" |> logging_function.()
 #
 #  defp info(message),
 #    do: log_message(message, &Logger.info/1)
 
 #  defp debug(message),
 #    do: log_message(message, &Logger.debug/1)
+
+  defp warning(message),
+    do: log_message(message, &Logger.warning/1)
 end

@@ -11,11 +11,7 @@ defmodule Errors do
   def queue_max_size_exeded(max_size),
     do: {:max_size_exceded, 400, "queue max size (#{max_size}) cannot be exceded"}
 
-
-  def json(reason) do
-    case reason do
-      { type, code, description } -> Jason.encode!([type: type, code: code, description: description])
-      _ -> "Unknown error"
-    end
+  def invalid_work_mode(work_mode) do
+    {:invalid_work_mode, 400, "Work mode \"#{work_mode}\" does not exist. Valid work modes are: :publish_subscribe and :work_queue"}
   end
 end
