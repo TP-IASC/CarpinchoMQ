@@ -39,7 +39,12 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
-    { :noreply, update_specific_element(state, message, &(init_element(&1, subscribers))) }
+    { :noreply, update_specific_element(state, message, &(init_sent_element_props(&1, subscribers))) }
+  end
+
+  def handle_cast({:update_next_subscriber_to_send, next_subscriber_to_send}, state) do
+    new_state = update_next_subscriber(state, next_subscriber_to_send)
+    { :noreply, new_state }
   end
 
   def handle_cast({:ack, message_id, consumer}, state) do
