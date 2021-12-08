@@ -30,7 +30,7 @@ defmodule Queue do
 
       # Por ahi conviene que sea call para que el proceso que envia la request tenga una confirmacion de recepcion
       def handle_cast({:horde, :resolve_conflict, remote_state}, state) do
-        Logger.info "Resolving conflicts in #{state.name}..."
+        info(state.name, "resolving conflicts")
         new_state = Map.put(state, :elements, Queue.merge_queues(state.elements, remote_state.elements))
         {:noreply, new_state}
       end
@@ -52,9 +52,9 @@ defmodule Queue do
         Map.put(state, :elements, List.delete(state.elements, element))
       end
 
-      defp update_specific_element(state, message, update_element) do
+      defp update_specific_element(state, message_id, update_element) do
         Map.put(state, :elements, Enum.map(state.elements, fn element ->
-          if element.message == message do update_element.(element) else element end
+          if element.message.id == message_id do update_element.(element) else element end
         end))
       end
 
@@ -76,7 +76,8 @@ defmodule Queue do
           |> increase_number_of_attempts
       end
 
-      defp increase_number_of_attempts(element), do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
+      defp increase_number_of_attempts(element),
+        do: Map.put(element, :number_of_attempts, element.number_of_attempts + 1)
 
       defp delete_subscribers(state, subscribers_to_delete) do
         state
@@ -96,6 +97,21 @@ defmodule Queue do
       end
 
       defp got_all_acks?(element), do: Enum.empty?(element.consumers_that_did_not_ack)
+
+      defp log_message(queue_name, message, logging_function),
+        do: "[QUEUE] [#{Atom.to_string(queue_name)}] #{message}" |> logging_function.()
+
+      defp debug(queue_name, message) do
+        log_message(queue_name, message, &Logger.debug/1)
+      end
+
+      defp info(queue_name, message) do
+        log_message(queue_name, message, &Logger.info/1)
+      end
+
+      defp warning(queue_name, message) do
+        log_message(queue_name, message, &Logger.warning/1)
+      end
     end
   end
 
@@ -141,8 +157,12 @@ defmodule Queue do
   end
 
   def call(queue_name, request) do
-    via_tuple(queue_name)
-      |> GenServer.call(request)
+    OK.for do
+      _ <- check_alive(queue_name)
+      result <- via_tuple(queue_name) |> GenServer.call(request) |> OK.wrap
+    after
+      result
+    end
   end
 
   def new(queue_name, max_size, work_mode) do
@@ -167,13 +187,13 @@ defmodule Queue do
   end
 
   defp check_name(queue_name),
-    do: OK.check({:ok, queue_name}, &(Queue.valid_name?(&1)), {:name_not_allowed, "Queue name #{inspect(queue_name)} is not allowed"})
+    do: OK.check({:ok, queue_name}, &(Queue.valid_name?(&1)), Errors.name_not_allowed(queue_name))
 
   defp check_not_alive(queue_name),
-    do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), {:queue_already_exists, "A queue named #{inspect(queue_name)} already exists"})
+    do: OK.check({:ok, queue_name}, &(!Queue.alive?(&1)), Errors.queue_already_exists(queue_name))
 
-  defp check_alive(queue_name),
-    do: OK.check({:ok, queue_name}, &(Queue.alive?(&1)), {:queue_not_found, "A queue named #{inspect(queue_name)} does not exist"})
+  def check_alive(queue_name),
+    do: OK.check({:ok, queue_name}, &(Queue.alive?(&1)), Errors.queue_not_found(queue_name))
 
   defp complete_check(queue_name, check) do
     OK.for do
