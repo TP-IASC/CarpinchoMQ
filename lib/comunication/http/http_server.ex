@@ -43,12 +43,12 @@ defmodule HTTPServer do
 
   post "/queues" do
     endpoint_info("POST", "/queues", conn.body_params)
-    %{ @queue => name, @size => max_size, @mode => work_mode } = conn.body_params
+    %{ @queue => name, @size => max_size_str, @mode => work_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
-    max_size = String.to_integer(max_size)
 
     creation_result = OK.for do
+      max_size <- cast_to_integer("maxSize", max_size_str)
       mode <- check_work_mode(atom_mode)
       result <- Producer.new_queue(atom_name, max_size, mode)
     after
@@ -99,6 +99,14 @@ defmodule HTTPServer do
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(code, data)
+  end
+
+
+  defp cast_to_integer(field, value) do
+    case Integer.parse(value) do
+      :error -> OK.failure(Errors.type_error(field, "integer", value))
+      { integer, _ } -> OK.success(integer)
+    end
   end
 
   defp check_work_mode(work_mode) do

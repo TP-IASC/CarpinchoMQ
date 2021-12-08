@@ -14,4 +14,8 @@ defmodule Errors do
   def invalid_work_mode(work_mode) do
     {:invalid_work_mode, 400, "Work mode \"#{work_mode}\" does not exist. Valid work modes are: :pub_sub and :work_queue"}
   end
+
+  def type_error(field, expected_type, value) do
+    {:invalid_work_mode, 400, "type error in #{field}, expected value: #{inspect(value)} to be of type: #{expected_type}"}
+  end
 end
