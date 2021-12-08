@@ -6,7 +6,7 @@ defmodule CarpinchoMQTest do
 
   # to run tests:
   #  > epmd -daemon
-  #  > mix test --no-start
+  #  > mix test
 
   setup do
     topologies = Application.get_env(:libcluster, :topologies)
@@ -21,7 +21,8 @@ defmodule CarpinchoMQTest do
 
   setup_with_mocks([
     {Consumer, [:passthrough], [cast: fn(consumer_pid, { :send_message, message, subscriber, _ }) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
-    {Queue, [:passthrough], [create_message: fn(payload) -> %{id: :"1", timestamp: ~U[2021-12-08 01:32:41.164744Z], payload: payload} end]}
+    {Queue, [:passthrough], [create_message: fn(payload) -> %{id: :"1", timestamp: ~U[2021-12-08 01:32:41.164744Z], payload: payload} end]},
+    {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
   ]) do
     :ok
   end
@@ -121,30 +122,51 @@ defmodule CarpinchoMQTest do
 
   test "receiving one ack for a specific message" do
     specific_message = "I'm not afraid! - Luke Skywalker"
-      Consumer.subscribe(:cola1, :consumer1)
-      Consumer.subscribe(:cola1, :consumer2)
-      Producer.push_message(:cola1, specific_message)
-      Producer.push_message(:cola1, "You will be - Yoda")
+    Consumer.subscribe(:cola1, :consumer1)
+    Consumer.subscribe(:cola1, :consumer2)
+    Producer.push_message(:cola1, specific_message)
+    Producer.push_message(:cola1, "You will be - Yoda")
 
-      assert [:consumer1, :consumer2] == List.last(Queue.state(:cola1).elements).consumers_that_did_not_ack
+    assert [:consumer1, :consumer2] == List.last(Queue.state(:cola1).elements).consumers_that_did_not_ack
 
-      log_captured = capture_log([level: :info], fn ->
-        Queue.cast(:cola1, {:send_ack, specific_message, :consumer1})
-      end)
+    log_captured = capture_log([level: :info], fn ->
+      Queue.cast(:cola1, {:send_ack, specific_message, :consumer1})
+    end)
 
-      elements = Queue.state(:cola1).elements
-      
-      assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
-      assert [:consumer2] == List.last(elements).consumers_that_did_not_ack
-      assert [:consumer1, :consumer2] == List.first(elements).consumers_that_did_not_ack
+    elements = Queue.state(:cola1).elements
+    
+    assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
+    assert [:consumer2] == List.last(elements).consumers_that_did_not_ack
+    assert [:consumer1, :consumer2] == List.first(elements).consumers_that_did_not_ack
   end
 
   test "receiving all acks for a specific message" do
+    specific_message = "I'm not afraid! - Luke Skywalker"
+    Consumer.subscribe(:cola1, :consumer1)
+    Consumer.subscribe(:cola1, :consumer2)
+    Producer.push_message(:cola1, specific_message)
+    Producer.push_message(:cola1, "You will be - Yoda")
+
+    elements_after_push = Queue.state(:cola1).elements
+    assert [:consumer1, :consumer2] == List.last(elements_after_push).consumers_that_did_not_ack
+    assert 2 == length(elements_after_push)
+
+    log_captured = capture_log([level: :info], fn ->
+      Queue.cast(:cola1, {:send_ack, specific_message, :consumer1})
+      Queue.cast(:cola1, {:send_ack, specific_message, :consumer2})
+    end)
+
+    elements_after_acks = Queue.state(:cola1).elements
     
+    assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
+    assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer2"
+    assert log_captured =~ "Got all ACKs of message #{specific_message}"
+    assert 1 == length(elements_after_acks)
+    assert [:consumer1, :consumer2] == List.first(elements_after_acks).consumers_that_did_not_ack
   end
 
   test "retrying sending a message" do
-    
+
   end
 
   test "5 attempts - pub-sub work mode" do

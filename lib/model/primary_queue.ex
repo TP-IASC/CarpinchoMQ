@@ -160,7 +160,7 @@ defmodule PrimaryQueue do
       |> Queue.cast(request)
   end
 
-  defp schedule_retry_call(message) do
+  def schedule_retry_call(message) do
     Process.send_after(self(), {:message_attempt_timeout, message}, 4000)
   end
 
