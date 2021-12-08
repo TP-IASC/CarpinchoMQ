@@ -16,15 +16,18 @@ defmodule PrimaryQueue do
 
   def handle_call({:push, payload}, _from, state) do
     size = Enum.count(state.elements)
-    if size >= state.max_size do
-      {:reply, OK.failure({:max_size_exceded, "Queue max size (#{state.max_size}) cannot be exceded"}), state}
-    else
-      new_message = create_message(payload)
-      send_to_replica(state.name, {:push, new_message})
-      check_work_mode(state, new_message)
+    cond do
+      size >= state.max_size ->
+        {:reply, OK.failure({:max_size_exceded, "Queue max size (#{state.max_size}) cannot be exceded"}), state}
+      Enum.count(state.subscribers) == 0 ->
+        {:reply, OK.failure({:no_subscribers, "The queue #{state.name} has no subscribers to send the message"}), state}
+      true ->
+        new_message = create_message(payload)
+        send_to_replica(state.name, {:push, new_message})
+        check_work_mode(state, new_message)
 
-      {:reply, OK.success(:message_queued), add_new_element(state, new_message)}
-    end
+        {:reply, OK.success(:message_queued), add_new_element(state, new_message)}
+      end
   end
 
   def handle_call({:subscribe, pid}, _from, state) do
@@ -55,7 +58,7 @@ defmodule PrimaryQueue do
       if rem(element.number_of_attempts, 5) == 0 do
         Logger.error "Handling message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{inspect element.consumers_that_did_not_ack}"
         case state.work_mode do
-          :publish_subscribe -> 
+          :publish_subscribe ->
             Queue.cast(state.name, {:delete, element})
             Queue.cast(state.name, {:delete_dead_subscribers, element.consumers_that_did_not_ack})
           :work_queue -> Queue.cast(state.name, {:send_to_subscriber, message})
