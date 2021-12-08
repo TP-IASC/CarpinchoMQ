@@ -179,6 +179,7 @@ defmodule Queue do
   def delete(queue_name) do
     OK.for do
       { primary_name, replica_name } <- complete_check(queue_name, &check_alive/1)
+      GenServer.cast(via_tuple(primary_name), :notify_shutdown)
       Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(primary_name))
       Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(replica_name))
     after

@@ -7,14 +7,13 @@ defmodule UDPServer do
     GenServer.start_link(__MODULE__, port, name: __MODULE__)
   end
 
-
   def init(port) do
     info("started server on port #{inspect(port)}")
     :gen_udp.open(port, [:binary, active: true])
   end
 
-  def handle_cast({:send_removed, queue_name, reason, consumer}, socket) do
-    UDPServer.send(queue_name, "removed", reason, consumer)
+  def handle_cast({:send_error, queue_name, reason, consumer}, socket) do
+    UDPServer.send(queue_name, "error", reason, consumer)
     { :noreply, socket }
   end
 
@@ -23,10 +22,10 @@ defmodule UDPServer do
     { :noreply, socket }
   end
 
-  def handle_cast({:send, queue_name, method, data, consumer}, socket) do
+  def handle_cast({:send, queue_name, type, data, consumer}, socket) do
     message = %{
       "queueName" => Atom.to_string(queue_name),
-      "method" => method,
+      "type" => type,
       "data" => data
     }
 
@@ -68,8 +67,8 @@ defmodule UDPServer do
     GenServer.cast(UDPServer, { :send_message, queue_name, message, consumer })
   end
 
-  def send_remove_notification(queue_name, reason, consumer) do
-    GenServer.cast(UDPServer, { :send_removed, queue_name, reason, consumer })
+  def send_error(queue_name, reason, consumer) do
+    GenServer.cast(UDPServer, { :send_error, queue_name, reason, consumer })
   end
 
   defp handle_packet("subscribe", %{ "queueName" => queue_name }, consumer) do
