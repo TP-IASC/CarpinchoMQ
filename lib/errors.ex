@@ -12,6 +12,6 @@ defmodule Errors do
     do: {:max_size_exceded, 400, "queue max size (#{max_size}) cannot be exceded"}
 
   def invalid_work_mode(work_mode) do
-    {:invalid_work_mode, 400, "Work mode \"#{work_mode}\" does not exist. Valid work modes are: :publish_subscribe and :work_queue"}
+    {:invalid_work_mode, 400, "Work mode \"#{work_mode}\" does not exist. Valid work modes are: :pub_sub and :work_queue"}
   end
 end

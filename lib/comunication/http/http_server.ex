@@ -20,7 +20,12 @@ defmodule HTTPServer do
   get "/queues/:name/state" do
     endpoint_info("GET", "/queues/#{name}/state")
     atom_name = String.to_atom(name)
-    maybe_state = Queue.state(atom_name)
+    maybe_state = OK.for do
+      state <- Queue.state(atom_name)
+      pretty = Map.put(state, :work_mode, state.work_mode.to_atom())
+    after
+      pretty
+    end
     handle_response(conn, maybe_state)
   end
 
@@ -41,8 +46,16 @@ defmodule HTTPServer do
     %{ @queue => name, @size => max_size, @mode => work_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
+    max_size = String.to_integer(max_size)
 
-    handle_post_response(conn, Producer.new_queue(atom_name, max_size, atom_mode))
+    creation_result = OK.for do
+      mode <- check_work_mode(atom_mode)
+      result <- Producer.new_queue(atom_name, max_size, mode)
+    after
+      result
+    end
+
+    handle_post_response(conn, creation_result)
   end
 
   @payload "payload"
@@ -86,6 +99,15 @@ defmodule HTTPServer do
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(code, data)
+  end
+
+  defp check_work_mode(work_mode) do
+    work_modes_mappings = [
+      pub_sub: PubSub,
+      work_queue: WorkQueue
+    ]
+
+    OK.check({:ok, work_modes_mappings[work_mode]}, &(&1 != nil), Errors.invalid_work_mode(work_mode))
   end
 
   defp endpoint_log(method, endpoint, body, logging_function),
