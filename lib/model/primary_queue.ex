@@ -106,6 +106,9 @@ defmodule PrimaryQueue do
 
   def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
     send_to_replica(state.name, {:delete_dead_subscribers, subscribers_to_delete})
+    Enum.each(subscribers_to_delete, fn sub ->
+      UDPServer.send_remove_notification(state.name, "timed out", sub)
+    end)
     { :noreply, delete_subscribers(state, subscribers_to_delete) }
   end
 
@@ -150,7 +153,7 @@ defmodule PrimaryQueue do
   defp send_message_to(message, subscribers, queue_name) do
     Enum.each(subscribers, fn subscriber ->
       debug(queue_name, "message #{inspect(message)} sent to #{inspect(subscriber)}")
-      GenServer.cast(UDPServer, { :send_message, queue_name, message, subscriber })
+      UDPServer.send_message(queue_name, message, subscriber)
     end)
     schedule_retry_call(message)
   end

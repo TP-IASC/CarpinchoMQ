@@ -1,6 +1,7 @@
 defmodule UDPServer do
   use GenServer
   require Logger
+  require OK
 
   def start_link(port \\ 2052) do
     GenServer.start_link(__MODULE__, port, name: __MODULE__)
@@ -12,15 +13,34 @@ defmodule UDPServer do
     :gen_udp.open(port, [:binary, active: true])
   end
 
+  def handle_cast({:send_removed, queue_name, reason, consumer}, socket) do
+    UDPServer.send(queue_name, "removed", reason, consumer)
+    { :noreply, socket }
+  end
+
   def handle_cast({:send_message, queue_name, message, consumer}, socket) do
+    UDPServer.send(queue_name, "message", message, consumer)
+    { :noreply, socket }
+  end
+
+  def handle_cast({:send, queue_name, method, data, consumer}, socket) do
     message = %{
       "queueName" => Atom.to_string(queue_name),
-      "message" => message
+      "method" => method,
+      "data" => data
     }
 
-    debug("sending #{inspect(message)} from #{queue_name} to #{inspect(consumer)}")
-    { :ok, address } = consumer.address |> to_charlist |> :inet.parse_address()
-    :gen_udp.send(socket, address, consumer.port, Jason.encode!(message))
+    OK.try do
+      json <- Jason.encode(message)
+      address <- consumer.address |> to_charlist |> :inet.parse_address()
+    after
+      debug("sending #{inspect(message)} from #{queue_name} to #{inspect(consumer)}")
+      :gen_udp.send(socket, address, consumer.port, json)
+    rescue
+      reason ->
+        warning("message send #{inspect(message)} failed, reason: #{reason}")
+    end
+
     { :noreply, socket }
   end
 
@@ -38,6 +58,18 @@ defmodule UDPServer do
     end
 
     { :noreply, socket }
+  end
+
+  def send(queue_name, method, data, consumer) do
+    GenServer.cast(UDPServer, { :send, queue_name, method, data, consumer })
+  end
+
+  def send_message(queue_name, message, consumer) do
+    GenServer.cast(UDPServer, { :send_message, queue_name, message, consumer })
+  end
+
+  def send_remove_notification(queue_name, reason, consumer) do
+    GenServer.cast(UDPServer, { :send_removed, queue_name, reason, consumer })
   end
 
   defp handle_packet("subscribe", %{ "queueName" => queue_name }, consumer) do
