@@ -10,9 +10,9 @@ services:
     image: carpincho-mq-image
     hostname: carpincho-mq-a
     ports:
-      - "5000:5000"
+      - "4000:4000"
     working_dir: /app
-    command: tail -f /dev/null
+    command: ["bash", "-c", "elixir --no-halt --sname a --cookie cookie app.exs"]
     networks:
       - carpinchomq
 
@@ -21,9 +21,9 @@ services:
     image: carpincho-mq-image
     hostname: carpincho-mq-b
     ports:
-      - "5001:5000"
+      - "4001:4001"
     working_dir: /app
-    command: tail -f /dev/null
+    command: ["bash", "-c", "elixir --no-halt --sname b --cookie cookie app.exs"]
     networks:
       - carpinchomq
 
@@ -32,8 +32,21 @@ services:
     image: carpincho-mq-image
     hostname: carpincho-mq-c
     ports:
-      - "5002:5000"
+      - "3333:3333"
     working_dir: /app
-    command: tail -f /dev/null
+    command: ["bash", "-c", "elixir --no-halt --sname c --cookie cookie app.exs"]
+    networks:
+      - carpinchomq
+
+  carpincho-mq-front:
+    container_name: carpincho-mq-front
+    image: carpincho-mq-front-image
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    command: npm start
+    volumes:
+      - './frontend:/app'
+      - '/app/node_modules'
     networks:
       - carpinchomq
