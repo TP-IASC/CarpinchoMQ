@@ -13,13 +13,14 @@ defmodule Queue do
         :name,
         :max_size,
         :work_mode,
+        :queue_mode,
         elements: [],
         subscribers: [],
         next_subscriber_to_send: 0
       ]
 
-      def start_link([name, max_size, work_mode]) when is_atom(name) do
-        default_state = %__MODULE__{name: name, max_size: max_size, work_mode: work_mode}
+      def start_link([name, max_size, work_mode,queue_mode]) when is_atom(name) do
+        default_state = %__MODULE__{name: name, max_size: max_size, work_mode: work_mode, queue_mode: queue_mode}
         GenServer.start_link(__MODULE__, default_state, name: via_tuple(name))
       end
 
@@ -165,12 +166,12 @@ defmodule Queue do
     end
   end
 
-  def new(queue_name, max_size, work_mode) do
+  def new(queue_name, max_size, work_mode, queue_mode) do
     OK.for do
       _ <- check_name(queue_name)
       { primary_name, replica_name } <- complete_check(queue_name, &check_not_alive/1)
-      primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size, work_mode]})
-      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode]})
+      primary_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {PrimaryQueue, [primary_name, max_size, work_mode, queue_mode]})
+      replica_pid <- Horde.DynamicSupervisor.start_child(App.HordeSupervisor, {ReplicaQueue, [replica_name, max_size, work_mode, queue_mode]})
     after
       {primary_pid, replica_pid}
     end
