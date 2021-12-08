@@ -29,6 +29,7 @@ defmodule CarpinchoMq.MixProject do
       { :horde, git: "https://github.com/TP-IASC/horde.git" },
       { :ok, "~> 2.3" },
       {:local_cluster, "~> 1.2", only: [:test]},
+      {:mock, "~> 0.3.0", only: :test}
     ]
   end
 end
