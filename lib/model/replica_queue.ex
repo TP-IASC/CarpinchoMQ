@@ -35,7 +35,7 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:unsubscribe, consumer}, state) do
-    { :noreply, remove_subscriber(state, consumer) }
+    { :noreply, remove_subscribers(state, [consumer]) }
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
@@ -43,15 +43,18 @@ defmodule ReplicaQueue do
   end
 
   def handle_cast({:update_next_subscriber_to_send, next_subscriber_to_send}, state) do
-    new_state = update_next_subscriber(state, next_subscriber_to_send)
-    { :noreply, new_state }
+    { :noreply, update_next_subscriber(state, next_subscriber_to_send) }
   end
 
   def handle_cast({:ack, message_id, consumer}, state) do
-    { :noreply, update_specific_element(state, message_id, &(update_consumers_that_did_not_ack(&1, consumer))) }
+    { :noreply, update_specific_element(state, message_id, &(update_consumers_that_did_not_ack(&1, [consumer]))) }
   end
 
   def handle_cast({:message_attempt_timeout, message}, state) do
     { :noreply, update_specific_element(state, message.id, &(increase_number_of_attempts(&1))) }
+  end
+
+  def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
+    { :noreply, delete_subscribers(state, subscribers_to_delete) }
   end
 end
