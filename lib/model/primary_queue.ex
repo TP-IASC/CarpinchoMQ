@@ -24,15 +24,19 @@ defmodule PrimaryQueue do
 
   def handle_call({:push, payload}, _from, state) do
     size = Enum.count(state.elements)
-    if size >= state.max_size do
-      { :reply, OK.failure(Errors.queue_max_size_exeded(state.max_size)), state }
-    else
-      new_message = create_message(payload)
-      send_to_replica(state.name, {:push, new_message})
-      check_work_mode(state, new_message)
+    cond do
+      size >= state.max_size ->
+        { :reply, OK.failure(Errors.queue_max_size_exeded(state.max_size)), state }
+      Enum.empty?(state.subscribers) ->
+        warning(state.name, "not enough subscribers to send the message: #{payload}, message discarded")
+        {:reply, OK.success(:message_queued), state}
+      true ->
+        new_message = create_message(payload)
+        send_to_replica(state.name, {:push, new_message})
+        check_work_mode(state, new_message)
 
-      {:reply, OK.success(:message_queued), add_new_element(state, new_message)}
-    end
+        {:reply, OK.success(:message_queued), add_new_element(state, new_message)}
+      end
   end
 
   def handle_call({:subscribe, consumer}, _from, state) do
@@ -115,22 +119,13 @@ defmodule PrimaryQueue do
   def handle_cast({:send_to_subscribers, message}, state) do
     queue_name = state.name
     all_subscribers = state.subscribers
-    if Enum.empty?(all_subscribers) do
-      warning(queue_name, "not enough subscribers to send the message")
-      { :noreply, state }
-    else
-      send_message_to(message, all_subscribers, queue_name)
-      {:noreply, add_receivers_to_state_message(state, all_subscribers, message)}
-    end
+    send_message_to(message, all_subscribers, queue_name)
+    {:noreply, add_receivers_to_state_message(state, all_subscribers, message)}
   end
 
   def handle_cast({:send_to_subscriber, message}, state) do
     queue_name = state.name
     all_subscribers = state.subscribers
-    if Enum.empty?(all_subscribers) do
-      warning(queue_name, "no subscribers to send the message to")
-      {:noreply, state}
-    end
     if length(all_subscribers) == state.next_subscriber_to_send  do
       subscriber_to_send = Enum.at(all_subscribers, 0)
       send_message_to(message, [subscriber_to_send], queue_name)
