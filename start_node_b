@@ -1,0 +1,1 @@
+iex --sname  b --cookie cookie -S mix
