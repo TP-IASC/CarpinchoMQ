@@ -10,9 +10,9 @@ services:
     image: carpincho-mq-image
     hostname: carpincho-mq-a
     ports:
-      - "4000:4000"
+      - "3333:3333"
     working_dir: /app
-    command: ["bash", "-c", "elixir --no-halt --sname a --cookie cookie app.exs"]
+    command: ["bash", "-c", "elixir --no-halt --sname a --cookie cookie -S mix run ./lib/app.ex 3333 8000"]
     networks:
       - carpinchomq
 
@@ -21,9 +21,9 @@ services:
     image: carpincho-mq-image
     hostname: carpincho-mq-b
     ports:
-      - "4001:4001"
+      - "4000:4000"
     working_dir: /app
-    command: ["bash", "-c", "elixir --no-halt --sname b --cookie cookie app.exs"]
+    command: ["bash", "-c", "elixir --no-halt --sname b --cookie cookie -S mix run ./lib/app.ex 4000 8001"]
     networks:
       - carpinchomq
 
@@ -32,9 +32,9 @@ services:
     image: carpincho-mq-image
     hostname: carpincho-mq-c
     ports:
-      - "3333:3333"
+      - "4001:4001"
     working_dir: /app
-    command: ["bash", "-c", "elixir --no-halt --sname c --cookie cookie app.exs"]
+    command: ["bash", "-c", "elixir --no-halt --sname c --cookie cookie -S mix run ./lib/app.ex 4001 8002"]
     networks:
       - carpinchomq
 
