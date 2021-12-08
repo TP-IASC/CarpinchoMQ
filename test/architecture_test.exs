@@ -1,6 +1,5 @@
 defmodule ArchitectureTest do
     use ExUnit.Case
-    doctest Queue
 
     setup do
         :ok = LocalCluster.start()

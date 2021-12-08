@@ -9,7 +9,7 @@ defmodule CarpinchoMq.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: [
-        test: "test --no-start"
+        test: "test --no-start --trace"
       ]
     ]
   end
@@ -28,8 +28,8 @@ defmodule CarpinchoMq.MixProject do
       { :libcluster, "~> 3.0" },
       { :horde, git: "https://github.com/TP-IASC/horde.git" },
       { :ok, "~> 2.3" },
-      {:local_cluster, "~> 1.2", only: [:test]},
-      {:mock, "~> 0.3.0", only: :test}
+      { :local_cluster, "~> 1.2", only: [:test] },
+      { :mock, "~> 0.3.0", only: :test },
     ]
   end
 end

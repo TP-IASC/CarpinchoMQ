@@ -1,7 +1,7 @@
 %{
   "delta_crdt": {:hex, :delta_crdt, "0.6.4", "79d235eef82a58bb0cb668bc5b9558d2e65325ccb46b74045f20b36fd41671da", [:mix], [{:merkle_map, "~> 0.2.0", [hex: :merkle_map, repo: "hexpm", optional: false]}, {:telemetry, "~> 0.4 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "4a81f579c06aeeb625db54c6c109859a38aa00d837e3e7f8ac27b40cea34885a"},
   "global_flags": {:hex, :global_flags, "1.0.0", "ee6b864979a1fb38d1fbc67838565644baf632212bce864adca21042df036433", [:rebar3], [], "hexpm", "85d944cecd0f8f96b20ce70b5b16ebccedfcd25e744376b131e89ce61ba93176"},
-  "horde": {:git, "https://github.com/TP-IASC/horde.git", "c8c72bf42c72cc0bfffca755b655ad7a02b250b2", []},
+  "horde": {:git, "https://github.com/TP-IASC/horde.git", "7c2fe187e3c9c2c08c24d71787ffebcb7870f751", []},
   "jason": {:hex, :jason, "1.2.2", "ba43e3f2709fd1aa1dce90aaabfd039d000469c05c56f0b8e31978e03fa39052", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "18a228f5f0058ee183f29f9eae0805c6e59d61c3b006760668d8d18ff0d12179"},
   "libcluster": {:hex, :libcluster, "3.3.0", "f7d45ff56d88e9fb4c30aee662480cbab69ebc0e7f7da4ad8d01b1e4f7492da8", [:mix], [{:jason, "~> 1.1", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm", "ecdcdc88334ec8eb18b10a13a1d5f22a3319a970b5b1e66cfe71c7719a4ab6cc"},
   "libring": {:hex, :libring, "1.5.0", "44313eb6862f5c9168594a061e9d5f556a9819da7c6444706a9e2da533396d70", [:mix], [], "hexpm", "04e843d4fdcff49a62d8e03778d17c6cb2a03fe2d14020d3825a1761b55bd6cc"},
