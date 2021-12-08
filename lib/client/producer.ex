@@ -13,7 +13,6 @@ defmodule Producer do
         }
       )
     else
-      Logger.info("Entre")
       Queue.new(queue_name, max_size, work_mode, queue_mode)
     end
   end

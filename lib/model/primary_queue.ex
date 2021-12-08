@@ -10,7 +10,10 @@ defmodule PrimaryQueue do
 
   def handle_continue(:check_replica, default_state) do
     replica = Queue.replica_name(default_state.name)
-    state = if Queue.alive?(replica), do: Queue.state(replica) |> Map.put(:name, default_state.name), else: default_state
+    state = if Queue.alive?(replica),
+               do: Queue.state(replica)
+                   |> Map.put(:name, default_state.name),
+               else: default_state
     {:noreply, state}
   end
 
@@ -43,7 +46,7 @@ defmodule PrimaryQueue do
     else
       send_to_replica(state.name, {:unsubscribe, pid})
 
-      { :reply, :unsubscribed, remove_subscribers(state, [pid]) }
+      {:reply, :unsubscribed, remove_subscribers(state, [pid])}
     end
   end
 
@@ -53,9 +56,11 @@ defmodule PrimaryQueue do
     element = get_element_by_message(state, message)
     unless element == nil or got_all_acks?(element) do
       if rem(element.number_of_attempts, 5) == 0 do
-        Logger.error "Handling message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{inspect element.consumers_that_did_not_ack}"
+        Logger.error "Handling message #{message.payload} after sending it 5 times. Consumers that didn't answer: #{
+          inspect element.consumers_that_did_not_ack
+        }"
         case state.work_mode do
-          :publish_subscribe -> 
+          :publish_subscribe ->
             Queue.cast(state.name, {:delete, element})
             Queue.cast(state.name, {:delete_dead_subscribers, element.consumers_that_did_not_ack})
           :work_queue -> Queue.cast(state.name, {:send_to_subscriber, message})
@@ -63,7 +68,9 @@ defmodule PrimaryQueue do
         {:noreply, state}
       else
         new_state = update_specific_element(state, message, &(increase_number_of_attempts(&1)))
-        Logger.info "Retrying send message #{message.payload} to consumers: #{inspect element.consumers_that_did_not_ack}. Attempt Nr. #{element.number_of_attempts + 1}"
+        Logger.info "Retrying send message #{message.payload} to consumers: #{
+          inspect element.consumers_that_did_not_ack
+        }. Attempt Nr. #{element.number_of_attempts + 1}"
         send_message_to(message, element.consumers_that_did_not_ack, queue_name)
         send_to_replica(state.name, {:message_attempt_timeout, message})
         {:noreply, new_state}
@@ -74,6 +81,8 @@ defmodule PrimaryQueue do
   end
 
   def handle_cast({:send_ack, message, consumer_pid}, state) do
+#    :timer.sleep(:timer.seconds(20)) # Para probar que es no transaccional y tener tiempo de ver el state
+    Logger.info("State and message before receiving ACK: State -> #{inspect state}; Message -> #{inspect message}")
     new_state = update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, [consumer_pid])))
 
     element = get_element_by_message(new_state, message)
@@ -92,12 +101,12 @@ defmodule PrimaryQueue do
 
   def handle_cast({:delete, element}, state) do
     send_to_replica(state.name, {:delete, element})
-    { :noreply, delete_element(state, element) }
+    {:noreply, delete_element(state, element)}
   end
 
   def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
     send_to_replica(state.name, {:delete_dead_subscribers, subscribers_to_delete})
-    { :noreply, delete_subscribers(state, subscribers_to_delete) }
+    {:noreply, delete_subscribers(state, subscribers_to_delete)}
   end
 
   def handle_cast({:send_to_subscribers, message}, state) do
@@ -108,7 +117,7 @@ defmodule PrimaryQueue do
       {:noreply, state}
     else
       send_message_to(message, all_subscribers, queue_name)
-      {:noreply, add_receivers_to_state_message(state, all_subscribers, message)}
+      {:noreply, check_queue_mode(state, message, all_subscribers)}
     end
   end
 
@@ -123,14 +132,23 @@ defmodule PrimaryQueue do
       subscriber_to_send = Enum.at(all_subscribers, 0)
       send_message_to(message, [subscriber_to_send], queue_name)
       new_state = update_next_subscribers_and_replica(state, 1)
-                  |> add_receivers_to_state_message([subscriber_to_send], message)
+                  |> check_queue_mode(message, [subscriber_to_send])
       {:noreply, new_state}
     else
       subscriber_to_send = Enum.at(all_subscribers, state.next_subscriber_to_send)
       send_message_to(message, [subscriber_to_send], queue_name)
       new_state = update_next_subscribers_and_replica(state, state.next_subscriber_to_send + 1)
-                  |> add_receivers_to_state_message([subscriber_to_send], message)
+                  |> check_queue_mode(message, [subscriber_to_send])
       {:noreply, new_state}
+    end
+  end
+
+  def check_queue_mode(state, message, all_subscribers) do
+    case state.queue_mode do
+      :transactional -> add_receivers_to_state_message(state, all_subscribers, message)
+      :non_transactional -> element = get_element_by_message(state, message)
+                            Queue.cast(state.name, {:delete, element})
+                            state
     end
   end
 
@@ -146,7 +164,7 @@ defmodule PrimaryQueue do
   end
 
   defp add_receivers_to_state_message(state, subscribers, message) do
-    send_to_replica(state.name, { :add_receivers_to_state_message, subscribers, message })
+    send_to_replica(state.name, {:add_receivers_to_state_message, subscribers, message})
     update_specific_element(state, message, &(init_sent_element_props(&1, subscribers)))
   end
 
@@ -157,7 +175,7 @@ defmodule PrimaryQueue do
 
   defp send_to_replica(queue_name, request) do
     Queue.replica_name(queue_name)
-      |> Queue.cast(request)
+    |> Queue.cast(request)
   end
 
   defp schedule_retry_call(message) do
