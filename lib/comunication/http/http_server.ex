@@ -42,7 +42,7 @@ defmodule HTTPServer do
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
 
-    handle_post_response(conn, Producer.new_queue(atom_name, max_size, atom_mode))
+    handle_response_with_success(conn, Producer.new_queue(atom_name, max_size, atom_mode))
   end
 
   @payload "payload"
@@ -52,14 +52,14 @@ defmodule HTTPServer do
     %{ @payload => payload } = conn.body_params
     atom_name = String.to_atom(name)
 
-    handle_post_response(conn, Producer.push_message(atom_name, payload))
+    handle_response_with_success(conn, Producer.push_message(atom_name, payload))
   end
 
 
   delete "/queues/:name" do
     endpoint_info(conn)
     queue_name = String.to_atom(name)
-    handle_post_response(conn, Producer.delete_queue(queue_name))
+    handle_response_with_success(conn, Producer.delete_queue(queue_name))
   end
 
 
@@ -70,7 +70,7 @@ defmodule HTTPServer do
     respond(conn, conn.status, "Unexpected error")
   end
 
-  def handle_post_response(conn, response) do
+  def handle_response_with_success(conn, response) do
     maybe_result =  response |> OK.flat_map(fn _ -> OK.success("success!") end)
     handle_response(conn, maybe_result)
   end
