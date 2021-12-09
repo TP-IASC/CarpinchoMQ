@@ -6,7 +6,7 @@ defmodule CarpinchoMQTest do
 
   # to run tests:
   #  > epmd -daemon
-  #  > mix test
+  #  > mix test test/carpincho_mq_test.exs
 
   setup do
     topologies = Application.get_env(:libcluster, :topologies)
@@ -97,7 +97,7 @@ defmodule CarpinchoMQTest do
     assert log_captured =~ "The queue cola1 has not subscribers to send the message: ¡Hello There! - Obi Wan Kenobi"
   end
 
-  @tag :errorsito
+  @tag :flaky
   test "the queue sends the message to all subscribers if it has pub-sub work mode" do
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
