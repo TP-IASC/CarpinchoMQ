@@ -93,6 +93,7 @@ defmodule CarpinchoMQTest do
   test "the queue has not subscribers to send the message" do
     log_captured = capture_log([level: :warning], fn -> 
       Producer.push_message(:cola1, "¡Hello There! - Obi Wan Kenobi")
+      Process.sleep(1000)
     end) 
     assert log_captured =~ "The queue cola1 has not subscribers to send the message: ¡Hello There! - Obi Wan Kenobi"
   end
@@ -104,6 +105,7 @@ defmodule CarpinchoMQTest do
 
     logs_captured = capture_log([level: :info], fn -> 
       Producer.push_message(:cola1, "General Kenobi... - Grievous")
+      Process.sleep(1000)
     end)
     assert logs_captured =~ "The consumer: consumer1 received the message: General Kenobi... - Grievous"
     assert logs_captured =~ "The consumer: consumer2 received the message: General Kenobi... - Grievous"
@@ -116,11 +118,13 @@ defmodule CarpinchoMQTest do
 
     first_log_captured = capture_log([level: :info], fn -> 
       Producer.push_message(:cola2, "¡Hello There! - Obi Wan Kenobi")
+      Process.sleep(1000)
     end)
     assert first_log_captured =~ "The consumer: consumer1 received the message: ¡Hello There! - Obi Wan Kenobi"      
 
     second_log_captured = capture_log([level: :info], fn -> 
       Producer.push_message(:cola2, "General Kenobi... - Grievous")
+      Process.sleep(1000)
     end)
     assert second_log_captured =~ "The consumer: consumer2 received the message: General Kenobi... - Grievous"
   end
@@ -138,6 +142,7 @@ defmodule CarpinchoMQTest do
 
     log_captured = capture_log([level: :info], fn ->
       Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer1})
+      Process.sleep(1000)
     end)
 
     assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
@@ -162,11 +167,13 @@ defmodule CarpinchoMQTest do
 
     first_log_captured = capture_log([level: :info], fn ->
       Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer1})
+      Process.sleep(1000)
     end)
     assert first_log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
 
     second_log_captured = capture_log([level: :info], fn ->
       Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer2})
+      Process.sleep(1000)
     end)
     assert second_log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer2"
     assert second_log_captured =~ "Got all ACKs of message #{specific_message}"
@@ -189,6 +196,7 @@ defmodule CarpinchoMQTest do
 
     logs_captured = capture_log([level: :info], fn ->
       send(Queue.whereis(:cola1), {:message_attempt_timeout, first_pushed_element.message})
+      Process.sleep(1000)
     end)
 
     assert logs_captured =~ "Retrying send message #{specific_message} to consumers: [:consumer1, :consumer2]. Attempt Nr. 2"
