@@ -18,14 +18,14 @@ defmodule HTTPServer do
 
 
   get "/queues/:name/state" do
-    endpoint_info("GET", "/queues/#{name}/state")
+    endpoint_info(conn)
     atom_name = String.to_atom(name)
     maybe_state = Queue.state(atom_name)
     handle_response(conn, maybe_state)
   end
 
   get "/queues" do
-    endpoint_info("GET", "/queues")
+    endpoint_info(conn)
     names = Utils.show_registry |> Enum.map(fn(x) -> x[:name] end) |> Enum.map(fn(x) -> Atom.to_string(x) end)
     names_without_replica = names |> Enum.filter(fn(n) -> !String.contains?(n, "_replica") end)
     handle_response(conn, OK.success(names_without_replica))
@@ -37,33 +37,40 @@ defmodule HTTPServer do
   @mode "workMode"
 
   post "/queues" do
-    endpoint_info("POST", "/queues", conn.body_params)
+    endpoint_info(conn)
     %{ @queue => name, @size => max_size, @mode => work_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
 
-    handle_post_response(conn, Producer.new_queue(atom_name, max_size, atom_mode))
+    handle_response_with_success(conn, Producer.new_queue(atom_name, max_size, atom_mode))
   end
 
   @payload "payload"
 
   post "/queues/:name/messages" do
-    endpoint_info("POST", "/queues/#{name}/messages", conn.body_params)
+    endpoint_info(conn)
     %{ @payload => payload } = conn.body_params
     atom_name = String.to_atom(name)
 
-    handle_post_response(conn, Producer.push_message(atom_name, payload))
+    handle_response_with_success(conn, Producer.push_message(atom_name, payload))
+  end
+
+
+  delete "/queues/:name" do
+    endpoint_info(conn)
+    queue_name = String.to_atom(name)
+    handle_response_with_success(conn, Producer.delete_queue(queue_name))
   end
 
 
   @impl Plug.ErrorHandler
   def handle_errors(conn, %{kind: _kind, reason: reason, stack: stack}) do
-    endpoint_warning(conn.method, conn.request_path, conn.body_params)
+    endpoint_warning(conn)
     warning("Unexpected error #{inspect({reason, stack})}")
     respond(conn, conn.status, "Unexpected error")
   end
 
-  def handle_post_response(conn, response) do
+  def handle_response_with_success(conn, response) do
     maybe_result =  response |> OK.flat_map(fn _ -> OK.success("success!") end)
     handle_response(conn, maybe_result)
   end
@@ -88,14 +95,14 @@ defmodule HTTPServer do
     |> send_resp(code, data)
   end
 
-  defp endpoint_log(method, endpoint, body, logging_function),
-    do: "[HTTP] #{method} #{endpoint} #{inspect(body)}" |> logging_function.()
+  defp endpoint_log(conn, logging_function),
+    do: "[HTTP] #{String.upcase(conn.method)} #{conn.request_path} #{inspect(conn.body_params)}" |> logging_function.()
 
-  defp endpoint_info(method, endpoint, body \\ %{}),
-    do: endpoint_log(method, endpoint, body, &Logger.info/1)
+  defp endpoint_info(conn),
+    do: endpoint_log(conn, &Logger.info/1)
 
-  defp endpoint_warning(method, endpoint, body),
-    do: endpoint_log(method, endpoint, body, &Logger.warning/1)
+  defp endpoint_warning(conn),
+    do: endpoint_log(conn, &Logger.warning/1)
 
   defp log_message(message, logging_function),
     do: "[HTTP] #{message}" |> logging_function.()
