@@ -27,6 +27,10 @@ defmodule CarpinchoMQTest do
     :ok
   end
 
+  test "cannot create a queue that already exists" do
+    assert {:error, {:queue_already_exists, "A queue named :cola1 already exists"}} == Producer.new_queue(:cola1, 345, :publish_subscribe)
+  end
+
   test "initial state of a just created queue is correct" do    
     actual_initial_state = Queue.state(:cola1)
     
