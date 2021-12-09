@@ -29,7 +29,7 @@ defmodule ArchitectureTest do
 
     [node1, _, _] = nodes
 
-    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+    {:ok, {primary_pid, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
 
@@ -54,12 +54,13 @@ defmodule ArchitectureTest do
     {:ok, _} = Application.ensure_all_started(:carpincho_mq)
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
 
-    [node1, node2, node3] = nodes
+    [node1, _, _] = nodes
 
-    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+    {:ok, {primary_pid, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
 
+    :rpc.call(node1, Consumer, :subscribe, [:cola1, :consumer1])
     :rpc.call(node1, Producer, :push_message, [:cola1, "Holanda"])
     :rpc.call(node1, Producer, :push_message, [:cola1, "Chaucha"])
 
@@ -71,8 +72,8 @@ defmodule ArchitectureTest do
 
     alive_node = Enum.find(nodes, fn node -> :rpc.call(node, Node, :alive?, []) == true end)
 
-    primary_queue_state = :rpc.call(alive_node, Queue, :state, [:cola1])
-    replica_queue_state = :rpc.call(alive_node, Queue, :state, [:cola1_replica])
+    {:ok, primary_queue_state} = :rpc.call(alive_node, Queue, :state, [:cola1])
+    {:ok, replica_queue_state} = :rpc.call(alive_node, Queue, :state, [:cola1_replica])
 
     Logger.info "The PrimaryQueue elements are: #{inspect primary_queue_state.elements}"
     Logger.info "The ReplicaQueue elements are: #{inspect replica_queue_state.elements}"
@@ -87,7 +88,7 @@ defmodule ArchitectureTest do
 
     [node1, node2, node3, node4] = nodes
 
-    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+    {:ok, {_, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
 
@@ -103,13 +104,14 @@ defmodule ArchitectureTest do
     Logger.info "Group 1 Registry: #{inspect :rpc.call(node1, Utils, :show_registry, [])}"
     Logger.info "Group 2 Registry: #{inspect :rpc.call(node3, Utils, :show_registry, [])}"
 
+    :rpc.call(node1, Consumer, :subscribe, [:cola1, :consumer1])
     :rpc.call(node1, Producer, :push_message, [:cola1, "Holanda"])
     :rpc.call(node3, Producer, :push_message, [:cola1, "Chaucha"])
 
     Process.sleep(10000)
 
-    group1_queue_state = :rpc.call(node1, Queue, :state, [:cola1])
-    group2_queue_state = :rpc.call(node3, Queue, :state, [:cola1])
+    {:ok, group1_queue_state} = :rpc.call(node1, Queue, :state, [:cola1])
+    {:ok, group2_queue_state} = :rpc.call(node3, Queue, :state, [:cola1])
     Logger.info "Group 1 State: #{inspect group1_queue_state}"
     Logger.info "Group 2 State: #{inspect group2_queue_state}"
   end

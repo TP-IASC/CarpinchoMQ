@@ -3,14 +3,22 @@ defmodule ReplicaQueue do
   require Logger
 
   def init(default_state) do
-    Logger.info "Queue: #{default_state.name} started"
+    info(default_state.name, "queue started")
     Process.flag(:trap_exit, true)
     { :ok, default_state }
   end
 
   def handle_continue(:check_replica, default_state) do
-    primary = Queue.primary_name(default_state.name)
-    state = if Queue.alive?(primary), do: Queue.state(primary) |> Map.put(:name, default_state.name), else: default_state
+    primary = Queue.replica_name(default_state.name)
+    state = OK.try do
+      primary_state <- Queue.state(primary)
+    after
+      debug(default_state.name, "restored from primary queue")
+      primary_state |> Map.put(:name, default_state.name)
+    rescue
+      _ -> default_state
+    end
+
     { :noreply, state }
   end
 
@@ -22,12 +30,12 @@ defmodule ReplicaQueue do
     { :noreply, delete_element(state, element) }
   end
 
-  def handle_cast({:subscribe, pid}, state) do
-    { :noreply, add_subscriber(state, pid) }
+  def handle_cast({:subscribe, consumer}, state) do
+    { :noreply, add_subscriber(state, consumer) }
   end
 
-  def handle_cast({:unsubscribe, pid}, state) do
-    { :noreply, remove_subscribers(state, [pid]) }
+  def handle_cast({:unsubscribe, consumer}, state) do
+    { :noreply, remove_subscribers(state, [consumer]) }
   end
 
   def handle_cast({:add_receivers_to_state_message, subscribers, message}, state) do
@@ -38,12 +46,12 @@ defmodule ReplicaQueue do
     { :noreply, update_next_subscriber(state, next_subscriber_to_send) }
   end
 
-  def handle_cast({:send_ack, message, consumer_pid}, state) do
-    { :noreply, update_specific_element(state, message, &(update_consumers_that_did_not_ack(&1, [consumer_pid]))) }
+  def handle_cast({:ack, message_id, consumer}, state) do
+    { :noreply, update_specific_element(state, message_id, &(update_consumers_that_did_not_ack(&1, [consumer]))) }
   end
 
   def handle_cast({:message_attempt_timeout, message}, state) do
-    { :noreply, update_specific_element(state, message, &(increase_number_of_attempts(&1))) }
+    { :noreply, update_specific_element(state, message.id, &(increase_number_of_attempts(&1))) }
   end
 
   def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do

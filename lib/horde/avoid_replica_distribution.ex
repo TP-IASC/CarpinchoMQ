@@ -12,7 +12,7 @@ defmodule AvoidReplica do
     end
 
     if Enum.empty?(filtered_members) do
-      Logger.info "Not enough nodes available"
+      error("not enough nodes available")
       System.stop(1)
     end
 
@@ -34,5 +34,9 @@ defmodule AvoidReplica do
       nil -> members
       _   -> Enum.filter(members, fn %{name: {_, node}} -> node != :erlang.node(other_pid) end)
     end
+  end
+
+  defp error(message) do
+    Logger.error("[HORDE_DISTRIBUTION] #{message}")
   end
 end

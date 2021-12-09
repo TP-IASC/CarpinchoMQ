@@ -20,7 +20,7 @@ defmodule CarpinchoMQTest do
   end
 
   setup_with_mocks([
-    {Consumer, [:passthrough], [cast: fn(consumer_pid, { :send_message, message, subscriber, _ }) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
+    {UDPServer, [:passthrough], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
     {Queue, [:passthrough], [create_message: fn(payload) -> %{id: :"1", timestamp: ~U[2021-12-08 01:32:41.164744Z], payload: payload} end]},
     {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
   ]) do
@@ -28,57 +28,66 @@ defmodule CarpinchoMQTest do
   end
 
   test "cannot create a queue that already exists" do
-    assert {:error, {:queue_already_exists, "A queue named :cola1 already exists"}} == Producer.new_queue(:cola1, 345, :publish_subscribe)
+    assert {:error, {:queue_already_exists, 409, "a queue named :cola1 already exists"}} == Producer.new_queue(:cola1, 345, :publish_subscribe)
   end
 
   test "initial state of a just created queue is correct" do    
-    actual_initial_state = Queue.state(:cola1)
+    {:ok, actual_initial_state} = Queue.state(:cola1)
     
     expected_initial_state = %PrimaryQueue{elements: [], max_size: 345, name: :cola1, subscribers: [], work_mode: :publish_subscribe}
     assert expected_initial_state == actual_initial_state
   end
 
   test "work mode can only be :publish_subscribe or :work_queue" do
-    non_existent_work_mode_error = {:error,{:non_existent_work_mode, "Work mode :hola does not exist. Available work modes: :publish_subscribe and :work_queue"}}
+    non_existent_work_mode_error = {:error,{:invalid_work_mode, 400, "Work mode hola does not exist. Valid work modes are: :publish_subscribe and :work_queue"}}
     assert Producer.new_queue(:cola2, 45, :hola) == non_existent_work_mode_error
   end
 
   test "consumer suscribes successfully" do
-    :subscribed = Consumer.subscribe(:cola1, :consumer1)
-    assert [:consumer1] == Queue.state(:cola1).subscribers
+    {:ok, :subscribed} = Consumer.subscribe(:cola1, :consumer1)
+    {_, state} = Queue.state(:cola1)
+    assert [:consumer1] == state.subscribers
 
-    :subscribed = Consumer.subscribe(:cola1, :consumer2)
-    assert [:consumer1, :consumer2] == Queue.state(:cola1).subscribers
+    {:ok, :subscribed} = Consumer.subscribe(:cola1, :consumer2)
+
+    {_, new_state} = Queue.state(:cola1)
+    assert [:consumer1, :consumer2] == new_state.subscribers
   end
 
   test "consumer can't suscribe if it is already suscribed" do
     Consumer.subscribe(:cola1, :consumer1)
-    assert :already_subscribed = Consumer.subscribe(:cola1, :consumer1)
+    assert {:ok, :already_subscribed} = Consumer.subscribe(:cola1, :consumer1)
   end
 
   test "consumer unsuscribes succesfully" do
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
 
-    :unsubscribed = Consumer.unsubscribe(:cola1, :consumer1)
-    assert [:consumer2] == Queue.state(:cola1).subscribers
+    {:ok, :unsubscribed} = Consumer.unsubscribe(:cola1, :consumer1)
+    {_, state} = Queue.state(:cola1)
+    assert [:consumer2] == state.subscribers
 
-    :unsubscribed = Consumer.unsubscribe(:cola1, :consumer2)
-    assert [] == Queue.state(:cola1).subscribers
+    {:ok, :unsubscribed} = Consumer.unsubscribe(:cola1, :consumer2)
+
+    {_, new_state} = Queue.state(:cola1)
+    assert [] == new_state.subscribers
   end
 
   test "consumer can't unsuscribe if it is not suscribed" do
-    assert :not_subscribed == Consumer.unsubscribe(:cola1, :consumer1)
+    assert {:ok, :not_subscribed} == Consumer.unsubscribe(:cola1, :consumer1)
   end
 
   test "new element is successfully added" do
     Consumer.subscribe(:cola1, :consumer1)
 
-    assert [] == Queue.state(:cola1).elements
+    {_, state} = Queue.state(:cola1)
+    assert [] == state.elements
     {:ok, :message_queued} = Producer.push_message(:cola1, "It's a trap! - Almirant Ackbar")
     
     expected_queue_elements = [%{consumers_that_did_not_ack: [:consumer1], message: %{id: :"1", payload: "It's a trap! - Almirant Ackbar", timestamp: ~U[2021-12-08 01:32:41.164744Z]}, number_of_attempts: 1}]
-    assert expected_queue_elements == Queue.state(:cola1).elements
+    
+    {_, new_state} = Queue.state(:cola1)
+    assert expected_queue_elements == new_state.elements
   end
 
   test "max size cannot be exceded" do
@@ -91,24 +100,25 @@ defmodule CarpinchoMQTest do
   end
 
   test "the queue has not subscribers to send the message" do
-    log_captured = capture_log([level: :warning], fn -> 
+    log_captured = capture_log(fn -> 
       Producer.push_message(:cola1, "¡Hello There! - Obi Wan Kenobi")
-      Process.sleep(1000)
+      Process.sleep(500)
     end) 
-    assert log_captured =~ "The queue cola1 has not subscribers to send the message: ¡Hello There! - Obi Wan Kenobi"
+    assert log_captured =~ "[QUEUE] [cola1] not enough subscribers to send the message: ¡Hello There! - Obi Wan Kenobi, message discarded"
   end
 
   @tag :flaky
   test "the queue sends the message to all subscribers if it has pub-sub work mode" do
+    message = "General Kenobi... - Grievous"
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
 
-    logs_captured = capture_log([level: :info], fn -> 
-      Producer.push_message(:cola1, "General Kenobi... - Grievous")
-      Process.sleep(1000)
+    logs_captured = capture_log(fn -> 
+      Producer.push_message(:cola1, message)
+      Process.sleep(500)
     end)
-    assert logs_captured =~ "The consumer: consumer1 received the message: General Kenobi... - Grievous"
-    assert logs_captured =~ "The consumer: consumer2 received the message: General Kenobi... - Grievous"
+    assert logs_captured =~ "[QUEUE] [cola1] message %{id: :\"1\", payload: \"#{message}\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer1"
+    assert logs_captured =~ "[QUEUE] [cola1] message %{id: :\"1\", payload: \"#{message}\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer2"
   end
 
   test "the queue sends the message to next subscriber if it has work-queue work mode" do
@@ -116,17 +126,17 @@ defmodule CarpinchoMQTest do
     Consumer.subscribe(:cola2, :consumer1)
     Consumer.subscribe(:cola2, :consumer2)
 
-    first_log_captured = capture_log([level: :info], fn -> 
+    first_log_captured = capture_log(fn -> 
       Producer.push_message(:cola2, "¡Hello There! - Obi Wan Kenobi")
-      Process.sleep(1000)
+      Process.sleep(500)
     end)
-    assert first_log_captured =~ "The consumer: consumer1 received the message: ¡Hello There! - Obi Wan Kenobi"      
+    assert first_log_captured =~ "[QUEUE] [cola2] message %{id: :\"1\", payload: \"¡Hello There! - Obi Wan Kenobi\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer1"      
 
-    second_log_captured = capture_log([level: :info], fn -> 
+    second_log_captured = capture_log(fn -> 
       Producer.push_message(:cola2, "General Kenobi... - Grievous")
-      Process.sleep(1000)
+      Process.sleep(500)
     end)
-    assert second_log_captured =~ "The consumer: consumer2 received the message: General Kenobi... - Grievous"
+    assert second_log_captured =~ "[QUEUE] [cola2] message %{id: :\"1\", payload: \"General Kenobi... - Grievous\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer2"
   end
 
   test "receiving one ack for a specific message" do
@@ -136,18 +146,20 @@ defmodule CarpinchoMQTest do
     Producer.push_message(:cola1, specific_message)
     Producer.push_message(:cola1, "You will be - Yoda")
 
-    elements_after_push = Queue.state(:cola1).elements
+    {_, state} = Queue.state(:cola1)
+    elements_after_push = state.elements
     first_pushed_element = List.last(elements_after_push)
     assert [:consumer1, :consumer2] == first_pushed_element.consumers_that_did_not_ack
 
-    log_captured = capture_log([level: :info], fn ->
-      Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer1})
-      Process.sleep(1000)
+    log_captured = capture_log(fn ->
+      Queue.cast(:cola1, {:ack, first_pushed_element.message.id, :consumer1})
+      Process.sleep(500)
     end)
 
-    assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
+    assert log_captured =~ "[QUEUE] [cola1] message 1 acknowledged by :consumer1"
 
-    elements = Queue.state(:cola1).elements
+    {_, new_state} = Queue.state(:cola1)
+    elements = new_state.elements
     
     assert [:consumer2] == List.last(elements).consumers_that_did_not_ack
     assert [:consumer1, :consumer2] == List.first(elements).consumers_that_did_not_ack
@@ -160,25 +172,27 @@ defmodule CarpinchoMQTest do
     Producer.push_message(:cola1, specific_message)
     Producer.push_message(:cola1, "You will be - Yoda")
 
-    elements_after_push = Queue.state(:cola1).elements
+    {_, state} = Queue.state(:cola1)
+    elements_after_push = state.elements
     first_pushed_element = List.last(elements_after_push)
     assert [:consumer1, :consumer2] == first_pushed_element.consumers_that_did_not_ack
     assert 2 == length(elements_after_push)
 
-    first_log_captured = capture_log([level: :info], fn ->
-      Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer1})
-      Process.sleep(1000)
+    first_log_captured = capture_log(fn ->
+      Queue.cast(:cola1, {:ack, first_pushed_element.message.id, :consumer1})
+      Process.sleep(500)
     end)
-    assert first_log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
+    assert first_log_captured =~ "[QUEUE] [cola1] message 1 acknowledged by :consumer1"
 
-    second_log_captured = capture_log([level: :info], fn ->
-      Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer2})
-      Process.sleep(1000)
+    second_log_captured = capture_log(fn ->
+      Queue.cast(:cola1, {:ack, first_pushed_element.message.id, :consumer2})
+      Process.sleep(500)
     end)
-    assert second_log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer2"
-    assert second_log_captured =~ "Got all ACKs of message #{specific_message}"
+    assert second_log_captured =~ "[QUEUE] [cola1] message 1 acknowledged by :consumer2"
+    assert second_log_captured =~ "message 1 received all ACKs"
 
-    elements_after_acks = Queue.state(:cola1).elements
+    {_, new_state} = Queue.state(:cola1)
+    elements_after_acks = new_state.elements
     assert 1 == length(elements_after_acks)
     assert [:consumer1, :consumer2] == List.first(elements_after_acks).consumers_that_did_not_ack
   end
@@ -190,20 +204,22 @@ defmodule CarpinchoMQTest do
     Producer.push_message(:cola1, specific_message)
     Producer.push_message(:cola1, "You will be - Yoda")
 
-    elements_after_push = Queue.state(:cola1).elements
+    {_, state} = Queue.state(:cola1)
+    elements_after_push = state.elements
     first_pushed_element = List.last(elements_after_push)
     assert 1 == first_pushed_element.number_of_attempts
 
-    logs_captured = capture_log([level: :info], fn ->
+    logs_captured = capture_log(fn ->
       send(Queue.whereis(:cola1), {:message_attempt_timeout, first_pushed_element.message})
-      Process.sleep(1000)
+      Process.sleep(500)
     end)
 
-    assert logs_captured =~ "Retrying send message #{specific_message} to consumers: [:consumer1, :consumer2]. Attempt Nr. 2"
-    assert logs_captured =~ "The consumer: consumer1 received the message: #{specific_message}"
-    assert logs_captured =~ "The consumer: consumer2 received the message: #{specific_message}"
+    assert logs_captured =~ "[QUEUE] [cola1] retrying send message 1 to consumers: [:consumer1, :consumer2]. Attempt Nr. 2"
+    assert logs_captured =~ "[QUEUE] [cola1] message %{id: :\"1\", payload: \"#{specific_message}\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer1"
+    assert logs_captured =~ "[QUEUE] [cola1] message %{id: :\"1\", payload: \"#{specific_message}\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer2"
 
-    elements_after_acks = Queue.state(:cola1).elements
+    {_, new_state} = Queue.state(:cola1)
+    elements_after_acks = new_state.elements
     assert 2 == List.last(elements_after_acks).number_of_attempts
   end
 
