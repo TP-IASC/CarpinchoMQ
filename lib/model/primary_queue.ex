@@ -79,7 +79,6 @@ defmodule PrimaryQueue do
     element = get_element_by_message(new_state, message)
     unless element == nil do
       Logger.info "Got an ACK of message #{message.payload}, from consumer: #{inspect consumer_pid}"
-      Logger.info "todos los acks? #{got_all_acks?(element)} - #{inspect element.consumers_that_did_not_ack}"
       if got_all_acks?(element) do
         Logger.info "Got all ACKs of message #{message.payload}"
         Queue.cast(state.name, {:delete, element})

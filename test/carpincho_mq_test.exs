@@ -93,6 +93,7 @@ defmodule CarpinchoMQTest do
     assert log_captured =~ "The queue cola1 has not subscribers to send the message: ¡Hello There! - Obi Wan Kenobi"
   end
 
+  @tag :errorsito
   test "the queue sends the message to all subscribers if it has pub-sub work mode" do
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
@@ -172,7 +173,26 @@ defmodule CarpinchoMQTest do
   end
 
   test "retrying sending a message" do
+    specific_message = "I'm not afraid! - Luke Skywalker"
+    Consumer.subscribe(:cola1, :consumer1)
+    Consumer.subscribe(:cola1, :consumer2)
+    Producer.push_message(:cola1, specific_message)
+    Producer.push_message(:cola1, "You will be - Yoda")
 
+    elements_after_push = Queue.state(:cola1).elements
+    first_pushed_element = List.last(elements_after_push)
+    assert 1 == first_pushed_element.number_of_attempts
+
+    logs_captured = capture_log([level: :info], fn ->
+      send(Queue.whereis(:cola1), {:message_attempt_timeout, first_pushed_element.message})
+    end)
+
+    assert logs_captured =~ "Retrying send message #{specific_message} to consumers: [:consumer1, :consumer2]. Attempt Nr. 2"
+    assert logs_captured =~ "The consumer: consumer1 received the message: #{specific_message}"
+    assert logs_captured =~ "The consumer: consumer2 received the message: #{specific_message}"
+
+    elements_after_acks = Queue.state(:cola1).elements
+    assert 2 == List.last(elements_after_acks).number_of_attempts
   end
 
   test "5 attempts - pub-sub work mode" do
