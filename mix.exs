@@ -30,6 +30,7 @@ defmodule CarpinchoMq.MixProject do
       { :ok, "~> 2.3" },
       { :local_cluster, "~> 1.2.1", only: [:test] },
       { :mock, "~> 0.3.7", only: :test },
+      { :schism, "~> 1.0", only: [:test]}
     ]
   end
 end
