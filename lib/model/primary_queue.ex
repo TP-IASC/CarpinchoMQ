@@ -111,7 +111,7 @@ defmodule PrimaryQueue do
   def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
     send_to_replica(state.name, {:delete_dead_subscribers, subscribers_to_delete})
     Enum.each(subscribers_to_delete, fn sub ->
-      UDPServer.send_remove_notification(state.name, "timed out", sub)
+      UDPServer.send_error(state.name, "timed out", sub)
     end)
     { :noreply, delete_subscribers(state, subscribers_to_delete) }
   end
@@ -139,6 +139,15 @@ defmodule PrimaryQueue do
                   |> add_receivers_to_state_message([subscriber_to_send], message)
       {:noreply, new_state}
     end
+  end
+
+
+  def handle_cast(:notify_shutdown, state) do
+    info(state.name, "queue deleted, notifying subscribers")
+    Enum.each(state.subscribers, fn sub ->
+      UDPServer.send_error(state.name, "the queue was deleted", sub)
+    end)
+    {:noreply, state}
   end
 
   defp is_subscriber?(consumer, state) do
