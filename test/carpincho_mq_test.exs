@@ -127,11 +127,12 @@ defmodule CarpinchoMQTest do
     Producer.push_message(:cola1, specific_message)
     Producer.push_message(:cola1, "You will be - Yoda")
 
-    old_elements = Queue.state(:cola1).elements
-    assert [:consumer1, :consumer2] == List.last(old_elements).consumers_that_did_not_ack
+    elements_after_push = Queue.state(:cola1).elements
+    first_pushed_element = List.last(elements_after_push)
+    assert [:consumer1, :consumer2] == first_pushed_element.consumers_that_did_not_ack
 
     log_captured = capture_log([level: :info], fn ->
-      Queue.cast(:cola1, {:send_ack, List.last(old_elements).message, :consumer1})
+      Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer1})
     end)
 
     assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
@@ -150,19 +151,22 @@ defmodule CarpinchoMQTest do
     Producer.push_message(:cola1, "You will be - Yoda")
 
     elements_after_push = Queue.state(:cola1).elements
-    assert [:consumer1, :consumer2] == List.last(elements_after_push).consumers_that_did_not_ack
+    first_pushed_element = List.last(elements_after_push)
+    assert [:consumer1, :consumer2] == first_pushed_element.consumers_that_did_not_ack
     assert 2 == length(elements_after_push)
 
-    log_captured = capture_log([level: :info], fn ->
-      Queue.cast(:cola1, {:send_ack, specific_message, :consumer1})
-      Queue.cast(:cola1, {:send_ack, specific_message, :consumer2})
+    first_log_captured = capture_log([level: :info], fn ->
+      Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer1})
     end)
+    assert first_log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
+
+    second_log_captured = capture_log([level: :info], fn ->
+      Queue.cast(:cola1, {:send_ack, first_pushed_element.message, :consumer2})
+    end)
+    assert second_log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer2"
+    assert second_log_captured =~ "Got all ACKs of message #{specific_message}"
 
     elements_after_acks = Queue.state(:cola1).elements
-    
-    assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer1"
-    assert log_captured =~ "Got an ACK of message #{specific_message}, from consumer: :consumer2"
-    assert log_captured =~ "Got all ACKs of message #{specific_message}"
     assert 1 == length(elements_after_acks)
     assert [:consumer1, :consumer2] == List.first(elements_after_acks).consumers_that_did_not_ack
   end

@@ -3,12 +3,12 @@ defmodule ArchitectureTest do
   require Logger
 
   setup do
-    #topologies = Application.get_env(:libcluster, :topologies)
-    #start_supervised({ Cluster.Supervisor, [topologies, [name: App.ClusterSupervisor]] })
-    #start_supervised(App.HordeRegistry)
-    #start_supervised({ App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] })
-    #start_supervised(App.NodeObserver.Supervisor)
-    Application.ensure_all_started(:carpincho_mq)
+    topologies = Application.get_env(:libcluster, :topologies)
+    start_supervised({ Cluster.Supervisor, [topologies, [name: App.ClusterSupervisor]] })
+    start_supervised(App.HordeRegistry)
+    start_supervised({ App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] })
+    start_supervised(App.NodeObserver.Supervisor)
+    #Application.ensure_all_started(:carpincho_mq)
 
     [node1, node2, node3] = LocalCluster.start_nodes("my-cluster", 3)
   
