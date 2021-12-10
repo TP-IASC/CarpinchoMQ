@@ -20,7 +20,12 @@ defmodule HTTPServer do
   get "/queues/:name/state" do
     endpoint_info(conn)
     atom_name = String.to_atom(name)
-    maybe_state = Queue.state(atom_name)
+    maybe_state = OK.for do
+      state <- Queue.state(atom_name)
+      pretty = Map.put(state, :work_mode, state.work_mode.to_atom())
+    after
+      pretty
+    end
     handle_response(conn, maybe_state)
   end
 
@@ -38,11 +43,20 @@ defmodule HTTPServer do
 
   post "/queues" do
     endpoint_info(conn)
-    %{ @queue => name, @size => max_size, @mode => work_mode } = conn.body_params
+
+    %{ @queue => name, @size => max_size_str, @mode => work_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
 
-    handle_response_with_success(conn, Producer.new_queue(atom_name, max_size, atom_mode))
+    creation_result = OK.for do
+      max_size <- cast_to_integer("maxSize", max_size_str)
+      mode <- check_work_mode(atom_mode)
+      result <- Producer.new_queue(atom_name, max_size, mode)
+    after
+      result
+    end
+
+    handle_response_with_success(conn, creation_result)
   end
 
   @payload "payload"
@@ -95,8 +109,24 @@ defmodule HTTPServer do
     |> send_resp(code, data)
   end
 
+  defp cast_to_integer(field, value) do
+    case Integer.parse(value) do
+      :error -> OK.failure(Errors.type_error(field, "integer", value))
+      { integer, _ } -> OK.success(integer)
+    end
+  end
+
+  defp check_work_mode(work_mode) do
+    work_modes_mappings = [
+      pub_sub: PubSub,
+      work_queue: WorkQueue
+    ]
+
+    OK.check({:ok, work_modes_mappings[work_mode]}, &(&1 != nil), Errors.invalid_work_mode(work_mode))
+  end
+
   defp endpoint_log(conn, logging_function),
-    do: "[HTTP] #{String.upcase(conn.method)} #{conn.request_path} #{inspect(conn.body_params)}" |> logging_function.()
+    do: log_message("#{String.upcase(conn.method)} #{conn.request_path} #{inspect(conn.body_params)}", logging_function)
 
   defp endpoint_info(conn),
     do: endpoint_log(conn, &Logger.info/1)
