@@ -11,7 +11,7 @@ defmodule ArchitectureTest do
 
   # Schism.partition(group2) crea una particion, Schism.heal(nodes) vuelve a unir a todos los nodos
   @tag :primary_replica_nodes
-  test "primary and replica queue are created in different nodes" do 
+  test "primary and replica queue are created in different nodes" do
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
 
     [node1, _, _] = nodes
@@ -19,8 +19,8 @@ defmodule ArchitectureTest do
 
     Process.sleep(3000)
 
-    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
-    
+    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, PubSub, :transactional])
+
     Process.sleep(3000)
 
     primary_queue_node = Utils.where_is(primary_pid, nodes)
@@ -38,8 +38,8 @@ defmodule ArchitectureTest do
     Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
 
     Process.sleep(3000)
-    
-    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+
+    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, PubSub, :transactional])
 
     Process.sleep(3000)
 
@@ -62,15 +62,15 @@ defmodule ArchitectureTest do
   end
 
   @tag :node_down_starts_queue_again_with_state
-  test "if the node that contains the primary queue breaks, the primary queue state comes from his replica" do 
+  test "if the node that contains the primary queue breaks, the primary queue state comes from his replica" do
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
 
     [node1, _, _] = nodes
     Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
 
     Process.sleep(3000)
-    
-    {:ok, {primary_pid, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+
+    {:ok, {primary_pid, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, PubSub, :transactional])
 
     Process.sleep(3000)
 
@@ -103,8 +103,8 @@ defmodule ArchitectureTest do
     Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
 
     Process.sleep(3000)
-    
-    {:ok, {_, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+
+    {:ok, {_, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, PubSub, :transactional])
 
     Process.sleep(3000)
 

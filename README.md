@@ -124,26 +124,26 @@ A continuacion te pasamos los comandos:
    ``` 
 * Crear una cola nueva: 
 ```elixir
-Producer.new_queue <nombre_cola, mensajes_maximos, modo_de_trabajo>
+Producer.new_queue <nombre_cola>, <tamaño_maximo>, <modo_de_trabajo>, <modo_de_transaccionalidad>
   ``` 
+  _Ejemplo:_
   ```elixir
-Producer.new_queue :cola1, 23, :publish_subscribe
+Producer.new_queue :cola1, 23, PubSub, :transactional
   ``` 
 * Pushear un mensaje a la cola: 
 ```elixir
-Producer.push_message <nombre_cola>,<mensaje>
+Producer.push_message <nombre_cola>, <mensaje>
   ``` 
-* Crear un Consumidor: 
-```elixir
-{:ok, pid} = Consumer.start_link
- ``` 
+* Crear un Consumidor:
+    - Un consumidor esta definido por un `direccion` y un `puerto` udp al que esta escuchando
+    - `consumer = %{address: <direccion>, port: <puerto>}`
 * Suscribir un consumidor a una cola: 
 ```elixir
-Consumer.subscribe <nombre_cola>,<pid_consumidor>
+Consumer.subscribe <nombre_cola>, consumer
  ``` 
 * Desuscribir un consumidor de una cola: 
 ```elixir
-Consumer.unsubscribe <nombre_cola>,<pid_consumidor>
+Consumer.unsubscribe <nombre_cola>, consumer
  ``` 
 * Ver el estado de una cola: 
 ```elixir

@@ -1,0 +1,55 @@
+version: '3.5'
+
+networks:
+  carpinchomq:
+      name: iasc
+
+services:
+  carpincho-mq-a:
+    container_name: carpincho-mq-a
+    image: carpincho-mq-image
+    hostname: carpincho-mq-a
+    ports:
+      - "3333:3333"
+      - "8079:8079/udp"
+    working_dir: /app
+    command: ["bash", "-c", "elixir --no-halt --sname a --cookie cookie -S mix run ./lib/app.ex 3333 8079"]
+    networks:
+      - carpinchomq
+
+  carpincho-mq-b:
+    container_name: carpincho-mq-b
+    image: carpincho-mq-image
+    hostname: carpincho-mq-b
+    ports:
+      - "4000:4000"
+      - "8080:8080/udp"
+    working_dir: /app
+    command: ["bash", "-c", "elixir --no-halt --sname b --cookie cookie -S mix run ./lib/app.ex 4000 8080"]
+    networks:
+      - carpinchomq
+
+  carpincho-mq-c:
+    container_name: carpincho-mq-c
+    image: carpincho-mq-image
+    hostname: carpincho-mq-c
+    ports:
+      - "4001:4001"
+      - "8081:8081/udp"
+    working_dir: /app
+    command: ["bash", "-c", "elixir --no-halt --sname c --cookie cookie -S mix run ./lib/app.ex 4001 8081"]
+    networks:
+      - carpinchomq
+
+  carpincho-mq-front:
+    container_name: carpincho-mq-front
+    image: carpincho-mq-front-image
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    command: npm start
+    volumes:
+      - './frontend:/app'
+      - '/app/node_modules'
+    networks:
+      - carpinchomq
