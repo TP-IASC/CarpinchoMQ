@@ -14,7 +14,7 @@
   <p align="center">
     Cola de mensajes Distribuida
     <br />
-    <a href="https://docs.google.com/presentation/d/1HgivT7YPVJQN71RMrjoUlzzz0X-XaXinuUV8ZzbuzTk/edit"><strong>Arquitectura</strong></a>
+    <a href="https://docs.google.com/presentation/d/1VDxvDrjhcT-lU6jzsXcdXj_cKO4XjDdpMJqDITbxtiM/edit?usp=sharing"><strong>Arquitectura</strong></a>
     <br />
     <br />
     <a href="https://github.com/TP-IASC/CarpinchoMQ/issues">Reportar Bug</a>
