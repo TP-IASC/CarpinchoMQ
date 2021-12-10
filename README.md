@@ -101,7 +101,8 @@ CarpinchoMQ nacio gracias a:
 Debemos tener instalado:
 * Visual Studio Code (recomendacion para levantar el proyecto).
 * [Elixir](https://elixir-lang.org/install.html) 
-* Horde, en caso de error al levantar el proyecto usar el comando:
+* Ejecutar el comando deps.get para obtener las dependencias del proyecto:
+
 ```sh
 mix deps.get
  ```
