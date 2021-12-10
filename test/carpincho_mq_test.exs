@@ -40,10 +40,12 @@ defmodule CarpinchoMQTest do
   import Mock
   import MyMatchers
 
+  @moduletag :capture_log
+
   # to run tests:
   #  > epmd -daemon
   #  > mix test test/carpincho_mq_test.exs
-  
+
   # usamos CaptureLog para poder assertear que se hizo un log en un determinado momento
 
   # start_supervised levanta un modulo de la app y lo supervisa el propio entorno de tests (el nodo que se levanta cuando corremos los tests)
@@ -66,12 +68,12 @@ defmodule CarpinchoMQTest do
     start_supervised({ App.HordeSupervisor, [strategy: :one_for_one] })
     start_supervised(App.NodeObserver.Supervisor)
 
-    {:ok, {primary_queue_pid, replica_queue_pid}} = Producer.new_queue(:cola1, 345, PubSub, :transactional)
+    {:ok, {_, _}} = Producer.new_queue(:cola1, 345, PubSub, :transactional)
     :ok
   end
 
   setup_with_mocks([
-    {UDPServer, [], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
+    {UDPServer, [], [send_message: fn(_, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
     {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
   ]) do
     :ok
@@ -140,8 +142,7 @@ defmodule CarpinchoMQTest do
     Consumer.subscribe(:cola2, :consumer1)
     Producer.push_message(:cola2, "Mensaje de prueba")
 
-    max_size_exceded_error = {:error, {:max_size_exceded, "Queue max size (1) cannot be exceded"}}
-    assert max_size_exceded_error = Producer.push_message(:cola2, "Mensaje que va a exceder el limite")
+    assert {:error, {:max_size_exceded, 400, "queue max size (1) cannot be exceded"}} = Producer.push_message(:cola2, "Mensaje que va a exceder el limite")
   end
 
   test "the queue has not subscribers to send the message" do

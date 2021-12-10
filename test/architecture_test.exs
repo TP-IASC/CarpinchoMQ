@@ -3,6 +3,8 @@ defmodule ArchitectureTest do
   require Logger
   import Mock
 
+  @moduletag :capture_log
+
   # To run one test: mix test test/architecture_test.exs --only <tag_name>
 
   # Application.ensure_all_started(:carpincho_mq) levanta toda la app en el nodo
@@ -12,7 +14,7 @@ defmodule ArchitectureTest do
 
   # Schism.partition(group2) crea una particion, Schism.heal(nodes) vuelve a unir a todos los nodos
   setup_with_mocks([
-    {UDPServer, [], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
+    {UDPServer, [], [send_message: fn(_, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
     {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
   ]) do
     :ok
