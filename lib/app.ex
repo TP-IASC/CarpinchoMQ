@@ -3,8 +3,16 @@ defmodule App do
   require Logger
 
   def start(_type, _args) do
-    http_port = Enum.fetch!(System.argv, 0) |> String.to_integer
-    udp_port = Enum.fetch!(System.argv, 1) |> String.to_integer
+    extra_childs = case Mix.env do
+      :test -> []
+      _ ->
+        http_port = Enum.fetch!(System.argv, 0) |> String.to_integer
+        udp_port = Enum.fetch!(System.argv, 1) |> String.to_integer
+        [
+          { HTTPServerSupervisor, http_port },
+          { UDPServerSupervisor, udp_port }
+        ]
+    end
 
     topologies = Application.get_env(:libcluster, :topologies)
 
@@ -13,9 +21,7 @@ defmodule App do
       App.HordeRegistry,
       { App.HordeSupervisor, [strategy: :one_for_one, distribution_strategy: AvoidReplica, process_redistribution: :active] },
       App.NodeObserver.Supervisor,
-      { HTTPServerSupervisor, http_port },
-      { UDPServerSupervisor, udp_port }
-    ]
+    ] ++ extra_childs
 
     Supervisor.start_link(children, strategy: :one_for_one)
   end

@@ -7,7 +7,10 @@ defmodule CarpinchoMq.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: [
+        test: "test --no-start --trace"
+      ]
     ]
   end
 
@@ -28,7 +31,11 @@ defmodule CarpinchoMq.MixProject do
       { :plug_cowboy, "~> 2.5.2" },
       { :poison, "~> 5.0" },
       { :corsica, "~> 1.0"},
-      { :jason, "~> 1.2" }
+      { :jason, "~> 1.2" },
+      { :local_cluster, "~> 1.2.1", only: [:test] },
+      { :mock, "~> 0.3.7", only: :test },
+      { :schism, "~> 1.0", only: [:test]},
+      { :ex_matchers, "~> 0.1.2", only: :test}
     ]
   end
 end
