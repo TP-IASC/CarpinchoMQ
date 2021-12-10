@@ -121,7 +121,7 @@ defmodule Queue do
 
   def merge_queues(queue1, queue2) do
     Enum.concat(queue1, queue2)
-      |> Enum.sort_by(fn msg -> msg.timestamp end, &DateTime.compare(&1, &2) != :lt)
+      |> Enum.sort_by(fn element -> element.message.timestamp end, &DateTime.compare(&1, &2) != :lt)
       |> Enum.dedup
   end
 

@@ -4,18 +4,20 @@ defmodule ArchitectureTest do
 
   # To run one test: mix test test/architecture_test.exs --only <tag_name>
 
-  # Application.ensure_all_started(:carpincho_mq) levanta toda la app en el entorno de tests
+  # Application.ensure_all_started(:carpincho_mq) levanta toda la app en el nodo
 
-  # usamos LocalCluster para crear varios nodos (si creamos 3, existen 3 + el nodo propio de los tests)
+  # usamos LocalCluster para crear varios nodos
   # se tarda un poco en levantar la cola, la replica, tirar un nodo, relevantar una cola, por eso tiré sleeps, aunque se que no es lo mejor
 
   # Schism.partition(group2) crea una particion, Schism.heal(nodes) vuelve a unir a todos los nodos
   @tag :primary_replica_nodes
   test "primary and replica queue are created in different nodes" do 
-    {:ok, _} = Application.ensure_all_started(:carpincho_mq)
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
 
     [node1, _, _] = nodes
+    Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
+
+    Process.sleep(3000)
 
     {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
     
@@ -30,11 +32,13 @@ defmodule ArchitectureTest do
 
   @tag :node_down_starts_queue_again
   test "if the node that contains the primary queue breaks, the primary queue is started in another node" do
-    {:ok, _} = Application.ensure_all_started(:carpincho_mq)
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
 
     [node1, _, _] = nodes
+    Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
 
+    Process.sleep(3000)
+    
     {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
@@ -43,7 +47,6 @@ defmodule ArchitectureTest do
     Logger.info "Replica Queue: #{inspect Utils.where_is(replica_pid, nodes)}"
     old_node = Utils.where_is(primary_pid, nodes)
     LocalCluster.stop_nodes([old_node])
-    # A veces crea la cola en el nodo manager (el entorno propio de tests) y como despues tiro el nodo donde esta la cola mueren los tests
 
     Process.sleep(3000)
 
@@ -60,11 +63,13 @@ defmodule ArchitectureTest do
 
   @tag :node_down_starts_queue_again_with_state
   test "if the node that contains the primary queue breaks, the primary queue state comes from his replica" do 
-    {:ok, _} = Application.ensure_all_started(:carpincho_mq)
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
 
     [node1, _, _] = nodes
+    Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
 
+    Process.sleep(3000)
+    
     {:ok, {primary_pid, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
@@ -92,11 +97,13 @@ defmodule ArchitectureTest do
 
   @tag :partition
   test "what happen if we have a partition and then connection is healed, the queues are merged into one" do
-    {:ok, _} = Application.ensure_all_started(:carpincho_mq)
     nodes = LocalCluster.start_nodes("carpincho", 4, files: [__ENV__.file])
 
     [node1, node2, node3, node4] = nodes
+    Enum.each(nodes, &Node.spawn(&1, __MODULE__, :initialize, []))
 
+    Process.sleep(3000)
+    
     {:ok, {_, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
@@ -108,20 +115,50 @@ defmodule ArchitectureTest do
     Schism.partition(group1)
     Schism.partition(group2)
 
-    Process.sleep(10000)
+    Process.sleep(3000)
 
     Logger.info "Group 1 Registry: #{inspect :rpc.call(node1, Utils, :show_registry, [])}"
     Logger.info "Group 2 Registry: #{inspect :rpc.call(node3, Utils, :show_registry, [])}"
 
+    Logger.info "Nodo1: #{inspect :rpc.call(node1, Node, :list, [])}"
+    Logger.info "Nodo3: #{inspect :rpc.call(node3, Node, :list, [])}"
+
     :rpc.call(node1, Consumer, :subscribe, [:cola1, :consumer1])
     :rpc.call(node1, Producer, :push_message, [:cola1, "Holanda"])
+
+    :rpc.call(node3, Consumer, :subscribe, [:cola1, :consumer1])
     :rpc.call(node3, Producer, :push_message, [:cola1, "Chaucha"])
 
-    Process.sleep(10000)
+    Process.sleep(3000)
 
     {:ok, group1_queue_state} = :rpc.call(node1, Queue, :state, [:cola1])
     {:ok, group2_queue_state} = :rpc.call(node3, Queue, :state, [:cola1])
     Logger.info "Group 1 State: #{inspect group1_queue_state}"
     Logger.info "Group 2 State: #{inspect group2_queue_state}"
+
+    assert Enum.find(group1_queue_state.elements, fn element -> element.message.payload == "Holanda" end) != nil
+    assert Enum.find(group1_queue_state.elements, fn element -> element.message.payload == "Chaucha" end) == nil
+
+    assert Enum.find(group2_queue_state.elements, fn element -> element.message.payload == "Holanda" end) == nil
+    assert Enum.find(group2_queue_state.elements, fn element -> element.message.payload == "Chaucha" end) != nil
+
+    Schism.heal(group1)
+    Schism.heal(group2)
+
+    Process.sleep(3000)
+
+    Logger.info "Nodo1: #{inspect :rpc.call(node1, Node, :list, [])}"
+    Logger.info "Nodo3: #{inspect :rpc.call(node3, Node, :list, [])}"
+    {:ok, state} = :rpc.call(node1, Queue, :state, [:cola1])
+    {:ok, state_again} = :rpc.call(node3, Queue, :state, [:cola1])
+    Logger.info "Group 1 State: #{inspect state}"
+    assert length(state.elements) == 2
+    assert length(state_again.elements) == 2
+  end
+
+  def initialize do
+    {:ok, _} = Application.ensure_all_started(:carpincho_mq)
+    receive do
+    end
   end
 end
