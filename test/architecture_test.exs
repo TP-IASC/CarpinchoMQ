@@ -4,6 +4,12 @@ defmodule ArchitectureTest do
 
   # To run one test: mix test test/architecture_test.exs --only <tag_name>
 
+  # Application.ensure_all_started(:carpincho_mq) levanta toda la app en el entorno de tests
+
+  # usamos LocalCluster para crear varios nodos (si creamos 3, existen 3 + el nodo propio de los tests)
+  # se tarda un poco en levantar la cola, la replica, tirar un nodo, relevantar una cola, por eso tiré sleeps, aunque se que no es lo mejor
+
+  # Schism.partition(group2) crea una particion, Schism.heal(nodes) vuelve a unir a todos los nodos
   @tag :primary_replica_nodes
   test "primary and replica queue are created in different nodes" do 
     {:ok, _} = Application.ensure_all_started(:carpincho_mq)
@@ -29,12 +35,15 @@ defmodule ArchitectureTest do
 
     [node1, _, _] = nodes
 
-    {:ok, {primary_pid, _}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
+    {:ok, {primary_pid, replica_pid}} = :rpc.call(node1, Queue, :new, [:cola1, 345, :publish_subscribe])
 
     Process.sleep(3000)
 
+    Logger.info "Primary Queue: #{inspect Utils.where_is(primary_pid, nodes)}"
+    Logger.info "Replica Queue: #{inspect Utils.where_is(replica_pid, nodes)}"
     old_node = Utils.where_is(primary_pid, nodes)
     LocalCluster.stop_nodes([old_node])
+    # A veces crea la cola en el nodo manager (el entorno propio de tests) y como despues tiro el nodo donde esta la cola mueren los tests
 
     Process.sleep(3000)
 

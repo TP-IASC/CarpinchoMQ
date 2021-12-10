@@ -10,6 +10,22 @@ defmodule CarpinchoMQTest do
   #  > epmd -daemon
   #  > mix test test/carpincho_mq_test.exs
 
+  # hay flaky tests :( creo que tienen que ver con el capture_log (si saco los sleeps se rompen mas y mas seguido)
+  # usamos CaptureLog para poder assertear que se hizo un log en un determinado momento
+
+  # start_supervised levanta un modulo de la app y lo supervisa el propio entorno de tests (el nodo que se levanta cuando corremos los tests)
+  # , asi cada vez que termina un test 
+  # el propio entorno termina todo satisfactoriamente
+
+  # usamos Mock para mockear al UDPServer y que no se le envie un mensaje
+  # mockeamos el schedule_retry_call para que no se reintente el envio cada x tiempo
+  # el passthrough es para que solo se mockee esa funcion, pero que todas las demas del module sean las reales
+  # setup_with_mocks levanta los mocks antes de cada test (setup + test_with_mocks)
+
+  # Acá: expect expected_queue_elements, to: be_equal(new_state.elements)
+  # usamos ExMatchers para poder comparar elementos sin importar el id que tenga cada uno y el timestamp (que son random para cada mensaje)
+  # creamos un ExMatcher Custom en MyMatchers (QueueElementsAreEqual)
+
   setup do
     topologies = Application.get_env(:libcluster, :topologies)
     start_supervised({ Cluster.Supervisor, [topologies, [name: App.ClusterSupervisor]] })
@@ -22,7 +38,7 @@ defmodule CarpinchoMQTest do
   end
 
   setup_with_mocks([
-    {UDPServer, [:passthrough], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
+    {UDPServer, [], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
     {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
   ]) do
     :ok
@@ -221,13 +237,5 @@ defmodule CarpinchoMQTest do
     {_, new_state} = Queue.state(:cola1)
     elements_after_acks = new_state.elements
     assert 2 == List.last(elements_after_acks).number_of_attempts
-  end
-
-  test "5 attempts - pub-sub work mode" do
-    
-  end
-
-  test "5 attempts - work-queue work mode" do
-    
   end
 end
