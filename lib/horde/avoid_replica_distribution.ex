@@ -5,18 +5,16 @@ defmodule AvoidReplica do
   def has_quorum?(_members), do: true
 
   def choose_node(child_spec, members) do
-    filtered_members = case child_spec.start do
+    valid_members = case child_spec.start do
+      _ when length(members) == 1 ->
+        warning("only one node available, primary and replica queues will be started on the same node, please connect to another node")
+        members
       {ReplicaQueue, :start_link, [[name|_]]} -> avoid_primary(members, name)
       {PrimaryQueue, :start_link, [[name|_]]} -> avoid_replica(members, name)
       _   -> members
     end
 
-    if Enum.empty?(filtered_members) do
-      error("not enough nodes available")
-      System.stop(1)
-    end
-
-    Horde.UniformDistribution.choose_node(child_spec, filtered_members)
+    Horde.UniformDistribution.choose_node(child_spec, valid_members)
   end
 
 
@@ -36,7 +34,7 @@ defmodule AvoidReplica do
     end
   end
 
-  defp error(message) do
-    Logger.error("[HORDE_DISTRIBUTION] #{message}")
+  defp warning(message) do
+    Logger.warning("[DISTRIBUTION_STRATEGY] #{message}")
   end
 end
