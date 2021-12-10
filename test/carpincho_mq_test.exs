@@ -43,8 +43,7 @@ defmodule CarpinchoMQTest do
   # to run tests:
   #  > epmd -daemon
   #  > mix test test/carpincho_mq_test.exs
-
-  # hay flaky tests :( creo que tienen que ver con el capture_log (si saco los sleeps se rompen mas y mas seguido)
+  
   # usamos CaptureLog para poder assertear que se hizo un log en un determinado momento
 
   # start_supervised levanta un modulo de la app y lo supervisa el propio entorno de tests (el nodo que se levanta cuando corremos los tests)
