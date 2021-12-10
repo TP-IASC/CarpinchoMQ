@@ -11,8 +11,9 @@ services:
     hostname: carpincho-mq-a
     ports:
       - "3333:3333"
+      - "8079:8079/udp"
     working_dir: /app
-    command: ["bash", "-c", "elixir --no-halt --sname a --cookie cookie -S mix run ./lib/app.ex 3333 8000"]
+    command: ["bash", "-c", "elixir --no-halt --sname a --cookie cookie -S mix run ./lib/app.ex 3333 8079"]
     networks:
       - carpinchomq
 
@@ -22,8 +23,9 @@ services:
     hostname: carpincho-mq-b
     ports:
       - "4000:4000"
+      - "8080:8080/udp"
     working_dir: /app
-    command: ["bash", "-c", "elixir --no-halt --sname b --cookie cookie -S mix run ./lib/app.ex 4000 8001"]
+    command: ["bash", "-c", "elixir --no-halt --sname b --cookie cookie -S mix run ./lib/app.ex 4000 8080"]
     networks:
       - carpinchomq
 
@@ -33,8 +35,9 @@ services:
     hostname: carpincho-mq-c
     ports:
       - "4001:4001"
+      - "8081:8081/udp"
     working_dir: /app
-    command: ["bash", "-c", "elixir --no-halt --sname c --cookie cookie -S mix run ./lib/app.ex 4001 8002"]
+    command: ["bash", "-c", "elixir --no-halt --sname c --cookie cookie -S mix run ./lib/app.ex 4001 8081"]
     networks:
       - carpinchomq
 
