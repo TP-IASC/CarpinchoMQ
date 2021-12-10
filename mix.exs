@@ -34,7 +34,8 @@ defmodule CarpinchoMq.MixProject do
       { :jason, "~> 1.2" },
       { :local_cluster, "~> 1.2.1", only: [:test] },
       { :mock, "~> 0.3.7", only: :test },
-      { :schism, "~> 1.0", only: [:test]}
+      { :schism, "~> 1.0", only: [:test]},
+      { :ex_matchers, "~> 0.1.2", only: :test}
     ]
   end
 end

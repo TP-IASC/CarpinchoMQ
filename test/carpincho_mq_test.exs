@@ -1,8 +1,10 @@
 defmodule CarpinchoMQTest do
   use ExUnit.Case
+  use ExMatchers
   require Logger
   import ExUnit.CaptureLog
   import Mock
+  import MyMatchers
 
   # to run tests:
   #  > epmd -daemon
@@ -21,7 +23,6 @@ defmodule CarpinchoMQTest do
 
   setup_with_mocks([
     {UDPServer, [:passthrough], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
-    {Queue, [:passthrough], [create_message: fn(payload) -> %{id: :"1", timestamp: ~U[2021-12-08 01:32:41.164744Z], payload: payload} end]},
     {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
   ]) do
     :ok
@@ -82,34 +83,33 @@ defmodule CarpinchoMQTest do
 
     {_, state} = Queue.state(:cola1)
     assert [] == state.elements
-    {:ok, :message_queued} = Producer.push_message(:cola1, "It's a trap! - Almirant Ackbar")
+    {:ok, :message_queued} = Producer.push_message(:cola1, "Mensajito")
     
-    expected_queue_elements = [%{consumers_that_did_not_ack: [:consumer1], message: %{id: :"1", payload: "It's a trap! - Almirant Ackbar", timestamp: ~U[2021-12-08 01:32:41.164744Z]}, number_of_attempts: 1}]
+    expected_queue_elements = [%{consumers_that_did_not_ack: [:consumer1], message: %{id: :"1", payload: "Mensajito", timestamp: ~U[2021-12-08 01:32:41.164744Z]}, number_of_attempts: 1}]
     
     {_, new_state} = Queue.state(:cola1)
-    assert expected_queue_elements == new_state.elements
+    expect expected_queue_elements, to: be_equal(new_state.elements)
   end
 
   test "max size cannot be exceded" do
     Producer.new_queue(:cola2, 1, :publish_subscribe)
     Consumer.subscribe(:cola2, :consumer1)
-    Producer.push_message(:cola2, "It's a trap! - Almirant Ackbar")
+    Producer.push_message(:cola2, "Mensaje de prueba")
 
     max_size_exceded_error = {:error, {:max_size_exceded, "Queue max size (1) cannot be exceded"}}
-    assert max_size_exceded_error = Producer.push_message(:cola2, "Exceed the max size, you should not - Yoda")
+    assert max_size_exceded_error = Producer.push_message(:cola2, "Mensaje que va a exceder el limite")
   end
 
   test "the queue has not subscribers to send the message" do
     log_captured = capture_log(fn -> 
-      Producer.push_message(:cola1, "¡Hello There! - Obi Wan Kenobi")
+      Producer.push_message(:cola1, "pushea2")
       Process.sleep(500)
     end) 
-    assert log_captured =~ "[QUEUE] [cola1] not enough subscribers to send the message: ¡Hello There! - Obi Wan Kenobi, message discarded"
+    assert log_captured =~ "[QUEUE] [cola1] not enough subscribers to send the message: pushea2, message discarded"
   end
 
-  @tag :flaky
   test "the queue sends the message to all subscribers if it has pub-sub work mode" do
-    message = "General Kenobi... - Grievous"
+    message = "Mensajito"
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
 
@@ -117,8 +117,8 @@ defmodule CarpinchoMQTest do
       Producer.push_message(:cola1, message)
       Process.sleep(500)
     end)
-    assert logs_captured =~ "[QUEUE] [cola1] message %{id: :\"1\", payload: \"#{message}\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer1"
-    assert logs_captured =~ "[QUEUE] [cola1] message %{id: :\"1\", payload: \"#{message}\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer2"
+    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]} sent to \:consumer1/
+    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]} sent to \:consumer1/
   end
 
   test "the queue sends the message to next subscriber if it has work-queue work mode" do
@@ -127,24 +127,24 @@ defmodule CarpinchoMQTest do
     Consumer.subscribe(:cola2, :consumer2)
 
     first_log_captured = capture_log(fn -> 
-      Producer.push_message(:cola2, "¡Hello There! - Obi Wan Kenobi")
+      Producer.push_message(:cola2, "Mensajito")
       Process.sleep(500)
     end)
-    assert first_log_captured =~ "[QUEUE] [cola2] message %{id: :\"1\", payload: \"¡Hello There! - Obi Wan Kenobi\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer1"      
+    assert first_log_captured =~ "[QUEUE] [cola2] message %{id: :\"1\", payload: \"Mensajito\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer1"      
 
     second_log_captured = capture_log(fn -> 
-      Producer.push_message(:cola2, "General Kenobi... - Grievous")
+      Producer.push_message(:cola2, "Mensajote")
       Process.sleep(500)
     end)
-    assert second_log_captured =~ "[QUEUE] [cola2] message %{id: :\"1\", payload: \"General Kenobi... - Grievous\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer2"
+    assert second_log_captured =~ "[QUEUE] [cola2] message %{id: :\"1\", payload: \"Mensajote\", timestamp: ~U[2021-12-08 01:32:41.164744Z]} sent to :consumer2"
   end
 
   test "receiving one ack for a specific message" do
-    specific_message = "I'm not afraid! - Luke Skywalker"
+    specific_message = "Mensajito"
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
     Producer.push_message(:cola1, specific_message)
-    Producer.push_message(:cola1, "You will be - Yoda")
+    Producer.push_message(:cola1, "Mensajote")
 
     {_, state} = Queue.state(:cola1)
     elements_after_push = state.elements
@@ -166,11 +166,11 @@ defmodule CarpinchoMQTest do
   end
 
   test "receiving all acks for a specific message" do
-    specific_message = "I'm not afraid! - Luke Skywalker"
+    specific_message = "Mensajito"
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
     Producer.push_message(:cola1, specific_message)
-    Producer.push_message(:cola1, "You will be - Yoda")
+    Producer.push_message(:cola1, "Mensajote")
 
     {_, state} = Queue.state(:cola1)
     elements_after_push = state.elements
@@ -198,11 +198,11 @@ defmodule CarpinchoMQTest do
   end
 
   test "retrying sending a message" do
-    specific_message = "I'm not afraid! - Luke Skywalker"
+    specific_message = "Mensajito"
     Consumer.subscribe(:cola1, :consumer1)
     Consumer.subscribe(:cola1, :consumer2)
     Producer.push_message(:cola1, specific_message)
-    Producer.push_message(:cola1, "You will be - Yoda")
+    Producer.push_message(:cola1, "Mensajote")
 
     {_, state} = Queue.state(:cola1)
     elements_after_push = state.elements
