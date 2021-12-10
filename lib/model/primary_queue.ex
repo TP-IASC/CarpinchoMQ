@@ -145,7 +145,7 @@ defmodule PrimaryQueue do
   def check_queue_mode(state, message, all_subscribers) do
     case state.queue_mode do
       :transactional -> add_receivers_to_state_message(state, all_subscribers, message)
-      :non_transactional -> element = get_element_by_message(state, message)
+      :non_transactional -> element = get_element_by_message(state, message.id)
                             Queue.cast(state.name, {:delete, element})
                             state
     end
