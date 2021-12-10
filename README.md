@@ -40,6 +40,7 @@
       <ul>
         <li><a href="#prerequisitos">Prerequisitos</a></li>
         <li><a href="#uso">Uso</a></li>
+         <li><a href="#docker">Docker</a></li>
       </ul>
     </li>
     <li><a href="#licencia">Licencia</a></li>
@@ -112,44 +113,76 @@ Para utilizar CarpinchoMQ debes levantar lineas de comando.
 A continuacion te pasamos los comandos:
 
 * Levantar un nodo nuevo en una consola (para tirarlo abajo Ctrl+C): 
- ```sh
-  iex --sname <nombre_nodo> -S mix 
+
+
+
+ ```elixir
+  iex --sname <nombre_nodo> --cookie <nombre_cookie> -S mix run ./lib/app.ex <puertohttp> <puertoudp>
    ``` 
- ```sh
-  iex --sname a -S mix 
+ ```elixir
+  iex --sname a --cookie cookie -S mix run ./lib/app.ex 3333 8000
    ``` 
 * Crear una cola nueva: 
-```sh
+```elixir
 Producer.new_queue <nombre_cola, mensajes_maximos, modo_de_trabajo>
   ``` 
-  ```sh
+  ```elixir
 Producer.new_queue :cola1, 23, :publish_subscribe
   ``` 
 * Pushear un mensaje a la cola: 
-```sh
+```elixir
 Producer.push_message <nombre_cola>,<mensaje>
   ``` 
 * Crear un Consumidor: 
-```sh
+```elixir
 {:ok, pid} = Consumer.start_link
  ``` 
 * Suscribir un consumidor a una cola: 
-```sh
+```elixir
 Consumer.subscribe <nombre_cola>,<pid_consumidor>
  ``` 
 * Desuscribir un consumidor de una cola: 
-```sh
+```elixir
 Consumer.unsubscribe <nombre_cola>,<pid_consumidor>
  ``` 
 * Ver el estado de una cola: 
-```sh
+```elixir
 Queue.state <nombre_cola>
  ``` 
 * Ver si una cola está viva: 
-```sh
+```elixir
 Queue.alive? <nombre_cola>
  ``` 
 
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+<!-- Docker-->
+## Docker
+
+4 Contenedores:
+
+* Nodo A: puerto 3333-8000 para que pueda acceder el front
+* Nodo B: puerto 4000-8001
+* Nodo C: puerto 4001-8002
+* Front: puerto 3000 http://localhost:3000/
+
+Prerequisitos:
+
+* Tener instalado docker en tu pc.
+* Tener la imagen generada de carpinchomq. Si no la tenes generada, en este proyecto (estando parado en el path principal):
+```docker
+docker build -t carpincho-mq-image ./
+```
+
+* Tener la imagen generada de carpinchomq-front.
+  Si no la tenes generada, en el proyecto de carpincho-mq-frontend (estando parado en el path principal):
+```docker
+docker build -t carpincho-mq-front-image ./
+```
+Una vez generada las imagenes, estando parado en la raiz del proyecto:
+```docker
+docker-compose up
+```
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- CONTRIBUTING -->

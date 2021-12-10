@@ -2,6 +2,23 @@ defmodule Queue do
   require Logger
   require OK
 
+  defstruct [
+    :name,
+    :max_size,
+    :work_mode,
+    elements: [],
+    subscribers: [],
+    next_subscriber_to_send: 0
+  ]
+
+  @type t() :: %__MODULE__{
+    name: atom(),
+    max_size: integer(),
+    work_mode: WorkMode.t(),
+    elements: list(),
+    next_subscriber_to_send: integer()
+  }
+
   defmacro __using__(_opts) do
     quote do
       use GenServer
@@ -9,18 +26,8 @@ defmodule Queue do
       require Logger
       require OK
 
-      defstruct [
-        :name,
-        :max_size,
-        :work_mode,
-        :queue_mode,
-        elements: [],
-        subscribers: [],
-        next_subscriber_to_send: 0
-      ]
-
-      def start_link([name, max_size, work_mode,queue_mode]) when is_atom(name) do
-        default_state = %__MODULE__{name: name, max_size: max_size, work_mode: work_mode, queue_mode: queue_mode}
+      def start_link([name, max_size, work_mode]) when is_atom(name) do
+        default_state = %Queue{name: name, max_size: max_size, work_mode: work_mode}
         GenServer.start_link(__MODULE__, default_state, name: via_tuple(name))
       end
 
@@ -98,21 +105,6 @@ defmodule Queue do
       end
 
       defp got_all_acks?(element), do: Enum.empty?(element.consumers_that_did_not_ack)
-
-      defp log_message(queue_name, message, logging_function),
-        do: "[QUEUE] [#{Atom.to_string(queue_name)}] #{message}" |> logging_function.()
-
-      defp debug(queue_name, message) do
-        log_message(queue_name, message, &Logger.debug/1)
-      end
-
-      defp info(queue_name, message) do
-        log_message(queue_name, message, &Logger.info/1)
-      end
-
-      defp warning(queue_name, message) do
-        log_message(queue_name, message, &Logger.warning/1)
-      end
     end
   end
 
@@ -166,7 +158,8 @@ defmodule Queue do
     end
   end
 
-  def new(queue_name, max_size, work_mode, queue_mode) do
+  @spec new(queue_name :: atom(), max_size :: integer(), work_mode :: WorkMode.t()) :: { :ok, any() } | { :error, any() }
+  def new(queue_name, max_size, work_mode) do
     OK.for do
       _ <- check_name(queue_name)
       { primary_name, replica_name } <- complete_check(queue_name, &check_not_alive/1)
@@ -180,6 +173,7 @@ defmodule Queue do
   def delete(queue_name) do
     OK.for do
       { primary_name, replica_name } <- complete_check(queue_name, &check_alive/1)
+      GenServer.cast(via_tuple(primary_name), :notify_shutdown)
       Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(primary_name))
       Horde.DynamicSupervisor.terminate_child(App.HordeSupervisor, whereis(replica_name))
     after
@@ -203,5 +197,20 @@ defmodule Queue do
     after
       { a, b }
     end
+  end
+
+  def log_message(queue_name, message, logging_function),
+  do: "[QUEUE] [#{Atom.to_string(queue_name)}] #{message}" |> logging_function.()
+
+  def debug(queue_name, message) do
+    log_message(queue_name, message, &Logger.debug/1)
+  end
+
+  def info(queue_name, message) do
+    log_message(queue_name, message, &Logger.info/1)
+  end
+
+  def warning(queue_name, message) do
+    log_message(queue_name, message, &Logger.warning/1)
   end
 end

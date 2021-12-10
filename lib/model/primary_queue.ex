@@ -33,8 +33,7 @@ defmodule PrimaryQueue do
       true ->
         new_message = create_message(payload)
         send_to_replica(state.name, {:push, new_message})
-        check_work_mode(state, new_message)
-
+        state.work_mode.push_message(state, new_message)
         {:reply, OK.success(:message_queued), add_new_element(state, new_message)}
       end
   end
@@ -64,15 +63,7 @@ defmodule PrimaryQueue do
     element = get_element_by_message(state, message.id)
     unless element == nil or Enum.empty?(element.consumers_that_did_not_ack) do
       if rem(element.number_of_attempts, 5) == 0 do
-        case state.work_mode do
-          :publish_subscribe ->
-            warning(state.name, "message timeout #{inspect(message)}, message discarded")
-            Queue.cast(state.name, {:delete, element})
-            Queue.cast(state.name, {:delete_dead_subscribers, element.consumers_that_did_not_ack})
-          :work_queue ->
-            warning(state.name, "message timeout #{inspect(message)}, retrying with the next subscriber")
-            Queue.cast(state.name, {:send_to_subscriber, message})
-        end
+        state.work_mode.handle_timeout(state, element)
         {:noreply, state}
       else
         new_state = update_specific_element(state, message.id, &(increase_number_of_attempts(&1)))
@@ -113,7 +104,7 @@ defmodule PrimaryQueue do
   def handle_cast({:delete_dead_subscribers, subscribers_to_delete}, state) do
     send_to_replica(state.name, {:delete_dead_subscribers, subscribers_to_delete})
     Enum.each(subscribers_to_delete, fn sub ->
-      UDPServer.send_remove_notification(state.name, "timed out", sub)
+      UDPServer.send_error(state.name, "timed out", sub)
     end)
     { :noreply, delete_subscribers(state, subscribers_to_delete) }
   end
@@ -152,6 +143,14 @@ defmodule PrimaryQueue do
     end
   end
 
+  def handle_cast(:notify_shutdown, state) do
+    info(state.name, "queue deleted, notifying subscribers")
+    Enum.each(state.subscribers, fn sub ->
+      UDPServer.send_error(state.name, "the queue was deleted", sub)
+    end)
+    {:noreply, state}
+  end
+
   defp is_subscriber?(consumer, state) do
     Enum.member?(state.subscribers, consumer)
   end
@@ -181,14 +180,6 @@ defmodule PrimaryQueue do
 
   defp schedule_retry_call(message) do
     Process.send_after(self(), {:message_attempt_timeout, message}, 4000)
-  end
-
-  defp check_work_mode(state, new_message) do
-    case state.work_mode do
-      :publish_subscribe -> Queue.cast(state.name, {:send_to_subscribers, new_message})
-      :work_queue -> Queue.cast(state.name, {:send_to_subscriber, new_message})
-    end
-    {:noreply, state}
   end
 
   defp get_element_by_message(state, message_id), do: Enum.find(state.elements, &(&1.message.id == message_id))
