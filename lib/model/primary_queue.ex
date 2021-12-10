@@ -134,6 +134,14 @@ defmodule PrimaryQueue do
     end
   end
 
+  def handle_cast(:notify_shutdown, state) do
+    info(state.name, "queue deleted, notifying subscribers")
+    Enum.each(state.subscribers, fn sub ->
+      UDPServer.send_error(state.name, "the queue was deleted", sub)
+    end)
+    {:noreply, state}
+  end
+
   def check_queue_mode(state, message, all_subscribers) do
     case state.queue_mode do
       :transactional -> add_receivers_to_state_message(state, all_subscribers, message)
@@ -141,14 +149,6 @@ defmodule PrimaryQueue do
                             Queue.cast(state.name, {:delete, element})
                             state
     end
-  end
-
-  def handle_cast(:notify_shutdown, state) do
-    info(state.name, "queue deleted, notifying subscribers")
-    Enum.each(state.subscribers, fn sub ->
-      UDPServer.send_error(state.name, "the queue was deleted", sub)
-    end)
-    {:noreply, state}
   end
 
   defp is_subscriber?(consumer, state) do

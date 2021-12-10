@@ -40,18 +40,20 @@ defmodule HTTPServer do
   @queue "name"
   @size "maxSize"
   @mode "workMode"
+  @queue_mode "queueMode"
 
   post "/queues" do
     endpoint_info(conn)
 
-    %{ @queue => name, @size => max_size_str, @mode => work_mode } = conn.body_params
+    %{ @queue => name, @size => max_size_str, @mode => work_mode, @queue_mode => queue_mode } = conn.body_params
     atom_name = String.to_atom(name)
     atom_mode = String.to_atom(work_mode)
+    atom_queue = String.to_atom(queue_mode)
 
     creation_result = OK.for do
       max_size <- cast_to_integer("maxSize", max_size_str)
       mode <- check_work_mode(atom_mode)
-      result <- Producer.new_queue(atom_name, max_size, mode)
+      result <- Producer.new_queue(atom_name, max_size, mode, atom_queue)
     after
       result
     end
