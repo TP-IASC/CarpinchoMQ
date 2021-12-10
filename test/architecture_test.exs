@@ -1,6 +1,7 @@
 defmodule ArchitectureTest do
   use ExUnit.Case
   require Logger
+  import Mock
 
   # To run one test: mix test test/architecture_test.exs --only <tag_name>
 
@@ -10,6 +11,13 @@ defmodule ArchitectureTest do
   # se tarda un poco en levantar la cola, la replica, tirar un nodo, relevantar una cola, por eso tiré sleeps, aunque se que no es lo mejor
 
   # Schism.partition(group2) crea una particion, Schism.heal(nodes) vuelve a unir a todos los nodos
+  setup_with_mocks([
+    {UDPServer, [], [send_message: fn(queue_name, message, subscriber) -> Logger.info "The consumer: #{subscriber} received the message: #{message.payload}" end]},
+    {PrimaryQueue, [:passthrough], [schedule_retry_call: fn(message) -> Logger.info "Scheduling retry call for message: #{message.payload}" end]}
+  ]) do
+    :ok
+  end
+
   @tag :primary_replica_nodes
   test "primary and replica queue are created in different nodes" do
     nodes = LocalCluster.start_nodes("carpincho", 3, files: [__ENV__.file])
@@ -145,7 +153,7 @@ defmodule ArchitectureTest do
     Schism.heal(group1)
     Schism.heal(group2)
 
-    Process.sleep(3000)
+    Process.sleep(5000)
 
     Logger.info "Nodo1: #{inspect :rpc.call(node1, Node, :list, [])}"
     Logger.info "Nodo3: #{inspect :rpc.call(node3, Node, :list, [])}"
