@@ -103,7 +103,7 @@ defmodule CarpinchoMQTest do
   test "the queue has not subscribers to send the message" do
     log_captured = capture_log(fn -> 
       Producer.push_message(:cola1, "pushea2")
-      Process.sleep(500)
+      Process.sleep(1000)
     end) 
     assert log_captured =~ "[QUEUE] [cola1] not enough subscribers to send the message: pushea2, message discarded"
   end
@@ -115,10 +115,10 @@ defmodule CarpinchoMQTest do
 
     logs_captured = capture_log(fn -> 
       Producer.push_message(:cola1, message)
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
-    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/
-    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/
+    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:\\\"[[:alnum:]]*\\\"\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/
+    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:\\\"[[:alnum:]]*\\\"\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/
   end
 
   test "the queue sends the message to next subscriber if it has work-queue work mode" do
@@ -128,15 +128,15 @@ defmodule CarpinchoMQTest do
 
     first_log_captured = capture_log(fn -> 
       Producer.push_message(:cola2, "Mensajito")
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
-    assert first_log_captured =~ ~r/\[QUEUE\] \[cola2\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/      
+    assert first_log_captured =~ ~r/\[QUEUE\] \[cola2\] message \%\{id\: \:\\\"[[:alnum:]]*\\\"\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/      
 
     second_log_captured = capture_log(fn -> 
       Producer.push_message(:cola2, "Mensajote")
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
-    assert second_log_captured =~ ~r/\[QUEUE\] \[cola2\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajote\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer2/
+    assert second_log_captured =~ ~r/\[QUEUE\] \[cola2\] message \%\{id\: \:\\\"[[:alnum:]]*\\\"\, payload\: \\\"Mensajote\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer2/
   end
 
   test "receiving one ack for a specific message" do
@@ -153,7 +153,7 @@ defmodule CarpinchoMQTest do
 
     log_captured = capture_log(fn ->
       Queue.cast(:cola1, {:ack, first_pushed_element.message.id, :consumer1})
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
 
     assert log_captured =~ ~r/\[QUEUE\] \[cola1\] message [[:alnum:]]* acknowledged by \:consumer1/
@@ -180,13 +180,13 @@ defmodule CarpinchoMQTest do
 
     first_log_captured = capture_log(fn ->
       Queue.cast(:cola1, {:ack, first_pushed_element.message.id, :consumer1})
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
     assert first_log_captured =~ ~r/\[QUEUE\] \[cola1\] message [[:alnum:]]* acknowledged by \:consumer1/
 
     second_log_captured = capture_log(fn ->
       Queue.cast(:cola1, {:ack, first_pushed_element.message.id, :consumer2})
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
     assert second_log_captured =~ ~r/\[QUEUE\] \[cola1\] message [[:alnum:]]* acknowledged by \:consumer2/
     assert second_log_captured =~ ~r/message [[:alnum:]]* received all ACKs/
@@ -211,12 +211,12 @@ defmodule CarpinchoMQTest do
 
     logs_captured = capture_log(fn ->
       send(Queue.whereis(:cola1), {:message_attempt_timeout, first_pushed_element.message})
-      Process.sleep(500)
+      Process.sleep(1000)
     end)
 
     assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] retrying send message [[:alnum:]]* to consumers\: \[\:consumer1\, \:consumer2\]\. Attempt Nr\. 2/
-    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/
-    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:[[:alnum:]]*\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer2/
+    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:\\\"[[:alnum:]]*\\\"\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer1/
+    assert logs_captured =~ ~r/\[QUEUE\] \[cola1\] message \%\{id\: \:\\\"[[:alnum:]]*\\\"\, payload\: \\\"Mensajito\\\"\, timestamp: \~U\[.*\]\} sent to \:consumer2/
 
     {_, new_state} = Queue.state(:cola1)
     elements_after_acks = new_state.elements
